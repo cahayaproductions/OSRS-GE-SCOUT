@@ -922,6 +922,25 @@ def api_update_install():
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)})
 
+@app.route("/api/update/restart", methods=["POST"])
+def api_update_restart():
+    """Herstart de app na een update."""
+    import subprocess
+    try:
+        app_dir = Path(__file__).resolve().parent
+        script = app_dir / "osrs_app.py"
+        # Start een nieuw proces dat even wacht en dan de app opnieuw start
+        subprocess.Popen(
+            ["bash", "-c", f'sleep 2 && cd "{app_dir}" && exec python3 osrs_app.py'],
+            start_new_session=True,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+        # Sluit het huidige proces na korte delay
+        threading.Timer(1.0, lambda: os._exit(0)).start()
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)})
+
 @app.route("/api/money/alch")
 def api_money_alch():
     staff = flask_request.args.get("staff", "fire")
@@ -2527,10 +2546,11 @@ async function doUpdate() {
         let r = await fetch('/api/update/install', {method: 'POST'});
         let d = await r.json();
         if (d.ok) {
-            btn.textContent = 'Geinstalleerd!';
+            btn.textContent = 'Herstarten...';
             btn.style.background = '#3fb950';
-            document.getElementById('update-title').innerHTML = `v${d.new_version} geinstalleerd — <b>herstart de app</b> om de update te activeren`;
+            document.getElementById('update-title').innerHTML = `v${d.new_version} geinstalleerd — app herstart...`;
             document.getElementById('update-changelog').textContent = 'Bestanden bijgewerkt: ' + d.updated.join(', ');
+            setTimeout(async () => { await fetch('/api/update/restart', {method:'POST'}); }, 1500);
         } else {
             btn.textContent = 'Mislukt';
             btn.style.background = '#da3633';
