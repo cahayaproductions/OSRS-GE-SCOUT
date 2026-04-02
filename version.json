@@ -1,6 +1,6 @@
 {
-  "version": "4.3",
-  "changelog": "K/M/B input support voor alle GP velden, developer tools prompt fix",
+  "version": "4.4",
+  "changelog": "Auto-restart na update, K/M/B input support, developer tools fix",
   "files": {
     "osrs_webapp.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_webapp.py",
     "osrs_app.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_app.py"
