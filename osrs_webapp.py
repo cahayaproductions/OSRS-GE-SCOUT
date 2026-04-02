@@ -36,7 +36,7 @@ API_BASE = "https://prices.runescape.wiki/api/v1/osrs"
 # ─────────────────────────────────────────────
 #  AUTO-UPDATE
 # ─────────────────────────────────────────────
-APP_VERSION = "4.5"
+APP_VERSION = "4.6"
 # ⬇️ PAS DIT AAN naar je eigen GitHub repo raw URL
 UPDATE_CHECK_URL = "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/version.json"
 # Het version.json bestand op GitHub moet er zo uitzien:
@@ -496,6 +496,17 @@ def market_scanner():
                 market["status"] = "OK"; market["error"] = None
             # Achtergrond: vul predictions voor favorieten + dure items die nog niet gecacht zijn
             _fill_missing_predictions(all_items)
+            # Update opps met nieuw gecachte predictions
+            now_bg = time.time()
+            for it in opps:
+                sid = str(it["id"])
+                if not it.get("predictions") and sid in _pred_cache and (now_bg - _pred_cache[sid].get("ts", 0)) < PRED_TTL:
+                    it["predictions"] = _pred_cache[sid]
+                    it["margin_freq"] = _pred_cache[sid].get("margin", {}).get("margin_freq", 0)
+                    it["momentum"] = _pred_cache[sid].get("momentum", {}).get("momentum", "stable")
+                    it["in_dip"] = _pred_cache[sid].get("momentum", {}).get("in_dip", False)
+            with market_lock:
+                market["opportunities"] = opps
         except Exception as e:
             with market_lock: market["error"] = str(e); market["status"] = f"Fout: {e}"
         time.sleep(settings["refresh_seconds"])
@@ -528,6 +539,11 @@ def api_market():
         opps = market["opportunities"]
         def ser(o):
             p = o.get("predictions", {})
+            # Fallback: check cache als predictions leeg zijn
+            if not p or (not p.get("margin") and not p.get("momentum")):
+                sid = str(o["id"])
+                if sid in _pred_cache:
+                    p = _pred_cache[sid]
             return {"id": o["id"], "name": o["name"], "buy_price": o["buy_price"], "sell_price": o["sell_price"],
                     "roi": o["roi"], "score": o["score"], "trend": o["trend"], "buy_limit": o["buy_limit"],
                     "limit_estimated": o.get("limit_estimated", False), "profit_flip": o["profit_flip"],

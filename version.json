@@ -1,6 +1,6 @@
 {
-  "version": "4.5",
-  "changelog": "Fix update banner display, auto-restart na update",
+  "version": "4.6",
+  "changelog": "Predictions fix voor alle tiers, cache fallback in ser()",
   "files": {
     "osrs_webapp.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_webapp.py",
     "osrs_app.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_app.py"
