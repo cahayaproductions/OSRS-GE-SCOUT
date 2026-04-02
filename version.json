@@ -1,6 +1,6 @@
 {
-  "version": "4.6",
-  "changelog": "Predictions fix voor alle tiers, cache fallback in ser()",
+  "version": "4.7",
+  "changelog": "GP weergave fix: volledige getallen onder 100K, 2 decimalen voor 100K+",
   "files": {
     "osrs_webapp.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_webapp.py",
     "osrs_app.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_app.py"
