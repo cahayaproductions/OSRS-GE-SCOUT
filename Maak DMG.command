@@ -191,84 +191,58 @@ else
     echo "⚠️  Code signing overgeslagen (gebruiker moet rechtermuisklik → Open gebruiken)"
 fi
 
-# ── 3. Maak DMG ──
-echo "⏳ DMG aanmaken..."
+# ── 3. Maak PKG installer ──
+echo "⏳ Installer (.pkg) aanmaken..."
 
-rm -rf "$STAGING"
-mkdir -p "$STAGING"
-cp -R "$APP_PATH" "$STAGING/"
-ln -s /Applications "$STAGING/Applications"
+PKG_PATH="${SCRIPT_DIR}/${DMG_NAME}.pkg"
+PKG_STAGING="/tmp/pkg_staging"
+PKG_SCRIPTS="/tmp/pkg_scripts"
 
-# ── Installeer script in DMG (verwijdert quarantine + opent app) ──
-cat > "$STAGING/Installeer OSRS GE Scout.command" << 'INSTALL_SCRIPT'
+rm -rf "$PKG_STAGING" "$PKG_SCRIPTS"
+mkdir -p "$PKG_STAGING/Applications"
+cp -R "$APP_PATH" "$PKG_STAGING/Applications/"
+
+# Post-install script: verwijdert quarantine en maakt launcher executable
+mkdir -p "$PKG_SCRIPTS"
+cat > "$PKG_SCRIPTS/postinstall" << 'POSTINSTALL'
 #!/bin/bash
-clear
-echo ""
-echo "  ╔══════════════════════════════════════════╗"
-echo "  ║   OSRS GE Scout — Installatie            ║"
-echo "  ╚══════════════════════════════════════════╝"
-echo ""
+APP="/Applications/OSRS GE Scout.app"
+xattr -cr "$APP" 2>/dev/null
+chmod +x "$APP/Contents/MacOS/launcher"
+# Open de app na installatie
+su "$USER" -c "open \"$APP\"" 2>/dev/null &
+exit 0
+POSTINSTALL
+chmod +x "$PKG_SCRIPTS/postinstall"
 
-DMG_DIR="$(dirname "$0")"
-APP_SRC="$DMG_DIR/OSRS GE Scout.app"
-APP_DST="/Applications/OSRS GE Scout.app"
+# Bouw de .pkg
+rm -f "$PKG_PATH"
+pkgbuild \
+    --root "$PKG_STAGING" \
+    --scripts "$PKG_SCRIPTS" \
+    --identifier "com.osrs.gescout" \
+    --version "1.0" \
+    --install-location "/" \
+    "$PKG_PATH" > /dev/null 2>&1
 
-if [ ! -d "$APP_SRC" ]; then
-    echo "❌ App niet gevonden. Open dit bestand vanuit de DMG."
+if [ $? -ne 0 ]; then
+    echo "❌ PKG aanmaken mislukt."
     read -p "Druk Enter om te sluiten..."
     exit 1
 fi
 
-echo "⏳ App kopiëren naar Applications..."
-cp -R "$APP_SRC" "$APP_DST" 2>/dev/null
-if [ $? -ne 0 ]; then
-    echo "⏳ Admin rechten nodig..."
-    osascript -e 'do shell script "cp -R \"'"$APP_SRC"'\" \"/Applications/OSRS GE Scout.app\"" with administrator privileges' 2>/dev/null
-fi
-
-echo "⏳ Beveiliging instellen..."
-xattr -cr "$APP_DST" 2>/dev/null
-chmod +x "$APP_DST/Contents/MacOS/launcher"
-
-echo "✅ Geïnstalleerd!"
-echo ""
-echo "⏳ App wordt geopend..."
-sleep 1
-open "$APP_DST"
-
-echo ""
-echo "  Je kunt dit venster sluiten."
-sleep 2
-osascript -e 'tell application "Terminal" to close front window' 2>/dev/null &
-INSTALL_SCRIPT
-chmod +x "$STAGING/Installeer OSRS GE Scout.command"
-rm -f "$DMG_PATH"
-
-hdiutil create \
-    -volname "$DMG_NAME" \
-    -srcfolder "$STAGING" \
-    -ov \
-    -format UDZO \
-    "$DMG_PATH" > /dev/null 2>&1
-
-if [ $? -ne 0 ]; then
-    echo "❌ DMG aanmaken mislukt."
-    read -p "Druk Enter om te sluiten..."
-    exit 1
-fi
-
-rm -rf "$STAGING"
+rm -rf "$PKG_STAGING" "$PKG_SCRIPTS"
 rm -rf "$APP_PATH"
 
 echo ""
 echo "  ╔══════════════════════════════════════════╗"
-echo "  ║   ✅ DMG aangemaakt!                      ║"
+echo "  ║   ✅ Installer aangemaakt!                ║"
 echo "  ║                                          ║"
-echo "  ║   Bestand: OSRS GE Scout.dmg          ║"
+echo "  ║   Bestand: OSRS GE Scout.pkg          ║"
 echo "  ║   Locatie: zelfde map als dit script     ║"
 echo "  ║                                          ║"
 echo "  ║   Dit bestand kun je delen met anderen.  ║"
-echo "  ║   Zij dubbelklikken → slepen naar Apps.  ║"
+echo "  ║   Zij dubbelklikken → installeren.       ║"
 echo "  ╚══════════════════════════════════════════╝"
 echo ""
 
