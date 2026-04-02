@@ -2530,12 +2530,14 @@ async function checkForUpdate() {
     try {
         let r = await fetch('/api/update/check');
         let d = await r.json();
+        console.log('Update check:', JSON.stringify(d));
         if (d.has_update) {
+            let banner = document.getElementById('update-banner');
             document.getElementById('update-title').textContent = `Update beschikbaar: v${d.remote} (je hebt v${d.current})`;
             document.getElementById('update-changelog').textContent = d.changelog || '';
-            document.getElementById('update-banner').style.display = 'flex';
+            banner.style.cssText = 'display:flex;background:linear-gradient(90deg,#1a3a2a,#0d2818);border:1px solid #238636;border-radius:8px;padding:10px 18px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:12px';
         }
-    } catch(e) {}
+    } catch(e) { console.log('Update check failed:', e); }
 }
 
 async function doUpdate() {

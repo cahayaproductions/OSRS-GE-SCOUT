@@ -1,6 +1,6 @@
 {
-  "version": "4.4",
-  "changelog": "Auto-restart na update, K/M/B input support, developer tools fix",
+  "version": "4.5",
+  "changelog": "Fix update banner display, auto-restart na update",
   "files": {
     "osrs_webapp.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_webapp.py",
     "osrs_app.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_app.py"
