@@ -1607,7 +1607,7 @@ function showPage(p) {
 function gp(n) {
     if (n == null) return '?'; n = Math.round(n);
     if (Math.abs(n) >= 1e6) return (n/1e6).toFixed(2) + 'M';
-    if (Math.abs(n) >= 1e3) return (n/1e3).toFixed(1) + 'K';
+    if (Math.abs(n) >= 1e5) return (n/1e3).toFixed(2) + 'K';
     return n.toLocaleString();
 }
 function gpExact(n) { return n != null ? Math.round(n).toLocaleString() : '?'; }
