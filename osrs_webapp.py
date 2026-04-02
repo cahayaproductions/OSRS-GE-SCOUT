@@ -36,7 +36,7 @@ API_BASE = "https://prices.runescape.wiki/api/v1/osrs"
 # ─────────────────────────────────────────────
 #  AUTO-UPDATE
 # ─────────────────────────────────────────────
-APP_VERSION = "4.3"
+APP_VERSION = "4.5"
 # ⬇️ PAS DIT AAN naar je eigen GitHub repo raw URL
 UPDATE_CHECK_URL = "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/version.json"
 # Het version.json bestand op GitHub moet er zo uitzien:
@@ -924,18 +924,29 @@ def api_update_install():
 
 @app.route("/api/update/restart", methods=["POST"])
 def api_update_restart():
-    """Herstart de app na een update."""
+    """Herstart de app na een update via de .app bundle."""
     import subprocess
     try:
         app_dir = Path(__file__).resolve().parent
-        script = app_dir / "osrs_app.py"
-        # Start een nieuw proces dat even wacht en dan de app opnieuw start
-        subprocess.Popen(
-            ["bash", "-c", f'sleep 2 && cd "{app_dir}" && exec python3 osrs_app.py'],
-            start_new_session=True,
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-        )
-        # Sluit het huidige proces na korte delay
+        # Zoek de .app bundle (Resources → Contents → .app)
+        app_bundle = None
+        check = app_dir.parent.parent  # Contents/../ = .app
+        if check.suffix == ".app" and check.exists():
+            app_bundle = str(check)
+        if app_bundle:
+            # Herstart via 'open' zodat het icoon en menubalk correct blijven
+            subprocess.Popen(
+                ["bash", "-c", f'sleep 2 && open -n "{app_bundle}"'],
+                start_new_session=True,
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
+        else:
+            # Fallback: direct python starten
+            subprocess.Popen(
+                ["bash", "-c", f'sleep 2 && cd "{app_dir}" && exec python3 osrs_app.py'],
+                start_new_session=True,
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
         threading.Timer(1.0, lambda: os._exit(0)).start()
         return jsonify({"ok": True})
     except Exception as e:
@@ -1246,7 +1257,7 @@ tr:last-child td { border-bottom:none; }
         <span id="splash-status-text">Marktdata laden...</span>
     </div>
     <button class="splash-btn btn-go" id="splash-go" onclick="dismissSplash()">Doorgaan</button>
-    <div class="splash-version">v4.2</div>
+    <div class="splash-version" id="app-version-splash"></div>
 </div>
 
 <div class="app hidden-behind-splash">
@@ -1551,7 +1562,7 @@ tr:last-child td { border-bottom:none; }
     </div>
 </div>
 
-<div class="footer">OSRS GE Scout v4.2 — Auto-refresh elke 10s — Data opgeslagen in ~/.osrs_agent/</div>
+<div class="footer" id="app-version-footer"></div>
 </div>
 
 <script>
@@ -2566,6 +2577,16 @@ async function doUpdate() {
 }
 
 // INIT
+async function loadVersion() {
+    try {
+        let r = await fetch('/api/update/check');
+        let d = await r.json();
+        let v = d.current || '?';
+        document.getElementById('app-version-splash').textContent = 'v' + v;
+        document.getElementById('app-version-footer').textContent = 'OSRS GE Scout v' + v + ' — Auto-refresh elke 10s — Data opgeslagen in ~/.osrs_agent/';
+    } catch(e) {}
+}
+loadVersion();
 initSplash();
 checkForUpdate();
 setInterval(() => { if (splashDismissed) refreshDashboard(); }, 10000);
