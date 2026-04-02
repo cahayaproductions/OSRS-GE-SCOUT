@@ -204,6 +204,50 @@ rm -rf "$STAGING"
 mkdir -p "$STAGING"
 cp -R "$APP_PATH" "$STAGING/"
 ln -s /Applications "$STAGING/Applications"
+
+# ── Installeer script in DMG (verwijdert quarantine + opent app) ──
+cat > "$STAGING/Installeer OSRS GE Scout.command" << 'INSTALL_SCRIPT'
+#!/bin/bash
+clear
+echo ""
+echo "  ╔══════════════════════════════════════════╗"
+echo "  ║   OSRS GE Scout — Installatie            ║"
+echo "  ╚══════════════════════════════════════════╝"
+echo ""
+
+DMG_DIR="$(dirname "$0")"
+APP_SRC="$DMG_DIR/OSRS GE Scout.app"
+APP_DST="/Applications/OSRS GE Scout.app"
+
+if [ ! -d "$APP_SRC" ]; then
+    echo "❌ App niet gevonden. Open dit bestand vanuit de DMG."
+    read -p "Druk Enter om te sluiten..."
+    exit 1
+fi
+
+echo "⏳ App kopiëren naar Applications..."
+cp -R "$APP_SRC" "$APP_DST" 2>/dev/null
+if [ $? -ne 0 ]; then
+    echo "⏳ Admin rechten nodig..."
+    osascript -e 'do shell script "cp -R \"'"$APP_SRC"'\" \"/Applications/OSRS GE Scout.app\"" with administrator privileges' 2>/dev/null
+fi
+
+echo "⏳ Beveiliging instellen..."
+xattr -cr "$APP_DST" 2>/dev/null
+chmod +x "$APP_DST/Contents/MacOS/launcher"
+
+echo "✅ Geïnstalleerd!"
+echo ""
+echo "⏳ App wordt geopend..."
+sleep 1
+open "$APP_DST"
+
+echo ""
+echo "  Je kunt dit venster sluiten."
+sleep 2
+osascript -e 'tell application "Terminal" to close front window' 2>/dev/null &
+INSTALL_SCRIPT
+chmod +x "$STAGING/Installeer OSRS GE Scout.command"
 rm -f "$DMG_PATH"
 
 hdiutil create \
