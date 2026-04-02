@@ -90,17 +90,9 @@ elif [ -f "/usr/local/bin/brew" ]; then
     eval "$(/usr/local/bin/brew shellenv)"
 fi
 
-# ── Progress dialoog helper ──
+# ── Progress notificatie helper ──
 show_progress() {
-    # Toont een niet-blokkerende voortgangsmelding via een achtergrond osascript
-    osascript -e "display dialog \"$1\" buttons {\"\"} giving up after 300 with title \"OSRS GE Scout — Setup\" with icon note" &>/dev/null &
-    PROGRESS_PID=$!
-}
-kill_progress() {
-    # Sluit het voortgangsvenster
-    kill $PROGRESS_PID 2>/dev/null
-    osascript -e 'tell application "System Events" to click button 1 of window 1 of process "osascript"' 2>/dev/null
-    wait $PROGRESS_PID 2>/dev/null
+    osascript -e "display notification \"$1\" with title \"OSRS GE Scout — Setup\"" 2>/dev/null
 }
 
 # ── Installatie ──
@@ -108,9 +100,8 @@ install_dependencies() {
     if ! command -v python3 &> /dev/null; then
         if ! command -v brew &> /dev/null; then
             osascript -e 'display dialog "OSRS GE Scout heeft Python nodig.\n\nDit wordt nu automatisch geïnstalleerd via Homebrew.\nJe Mac wachtwoord kan gevraagd worden.\n\nDit duurt 2-5 minuten (alleen de eerste keer)." buttons {"Installeren"} default button 1 with title "OSRS GE Scout — Setup" with icon caution' 2>/dev/null
-            show_progress "Homebrew installeren...\n\nDit kan een paar minuten duren.\nSluit dit venster niet."
+            show_progress "Homebrew wordt geïnstalleerd... Dit duurt 2-5 minuten."
             /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" < /dev/null 2>&1 | tee /tmp/osrs_brew_install.log
-            kill_progress
             if [ -f "/opt/homebrew/bin/brew" ]; then
                 eval "$(/opt/homebrew/bin/brew shellenv)"
             elif [ -f "/usr/local/bin/brew" ]; then
@@ -121,9 +112,8 @@ install_dependencies() {
                 exit 1
             fi
         fi
-        show_progress "Python installeren...\n\nDit kan een paar minuten duren."
+        show_progress "Python wordt geïnstalleerd..."
         brew install python3 2>&1 | tee /tmp/osrs_python_install.log
-        kill_progress
         if ! command -v python3 &> /dev/null; then
             osascript -e 'display alert "Installatie mislukt" message "Python kon niet worden geïnstalleerd." as critical' 2>/dev/null
             exit 1
@@ -134,9 +124,13 @@ install_dependencies() {
     python3 -c "import requests" 2>/dev/null || NEED_PIP=1
     python3 -c "import webview" 2>/dev/null || NEED_PIP=1
     if [ $NEED_PIP -eq 1 ]; then
-        show_progress "Benodigde packages installeren...\n\nFlask, requests, pywebview\nDit duurt ~1 minuut."
-        pip3 install flask requests pywebview --quiet --break-system-packages 2>/dev/null || pip3 install flask requests pywebview --quiet 2>/dev/null
-        kill_progress
+        show_progress "Packages installeren (Flask, pywebview)... ~1 minuut."
+        pip3 install flask requests pywebview --break-system-packages 2>/tmp/osrs_pip_install.log || pip3 install flask requests pywebview 2>>/tmp/osrs_pip_install.log
+        # Check of alles geinstalleerd is
+        if ! python3 -c "import flask; import requests; import webview" 2>/dev/null; then
+            osascript -e 'display alert "Installatie mislukt" message "Packages konden niet worden geïnstalleerd.\nBekijk /tmp/osrs_pip_install.log voor details." as critical' 2>/dev/null
+            exit 1
+        fi
     fi
     mkdir -p "$HOME/.osrs_agent"
     touch "$FIRST_RUN_FILE"
