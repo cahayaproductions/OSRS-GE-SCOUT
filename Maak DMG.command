@@ -186,7 +186,18 @@ fi
 
 echo "✅ App gebouwd"
 
-# ── 2. Maak DMG ──
+# ── 2. Code signing (ad-hoc) ──
+echo "⏳ App ondertekenen..."
+chmod +x "$APP_PATH/Contents/MacOS/launcher"
+xattr -cr "$APP_PATH" 2>/dev/null
+codesign --force --deep -s - "$APP_PATH" 2>/dev/null
+if [ $? -eq 0 ]; then
+    echo "✅ App ondertekend (ad-hoc)"
+else
+    echo "⚠️  Code signing overgeslagen (gebruiker moet rechtermuisklik → Open gebruiken)"
+fi
+
+# ── 3. Maak DMG ──
 echo "⏳ DMG aanmaken..."
 
 rm -rf "$STAGING"
