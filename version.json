@@ -1,0 +1,8 @@
+{
+  "version": "4.2",
+  "changelog": "In-app updater, bulk items tier, VWAP pricing, bolt max winst",
+  "files": {
+    "osrs_webapp.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_webapp.py",
+    "osrs_app.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_app.py"
+  }
+}
