@@ -1286,8 +1286,8 @@ tr:last-child td { border-bottom:none; }
         <div class="sh t2">🧮 Flip Calculator</div>
         <div style="padding:18px">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:500px">
-                <div><label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">Koopprijs (GP)</label><input id="calc-buy" type="number" placeholder="bijv. 150000" oninput="updateCalc()" style="width:100%;padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#c9d1d9;font-size:14px"></div>
-                <div><label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">Verkoopprijs (GP)</label><input id="calc-sell" type="number" placeholder="bijv. 160000" oninput="updateCalc()" style="width:100%;padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#c9d1d9;font-size:14px"></div>
+                <div><label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">Koopprijs (GP)</label><input id="calc-buy" type="text" placeholder="bijv. 150k of 1.5m" oninput="updateCalc()" style="width:100%;padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#c9d1d9;font-size:14px"></div>
+                <div><label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">Verkoopprijs (GP)</label><input id="calc-sell" type="text" placeholder="bijv. 160k of 1.6m" oninput="updateCalc()" style="width:100%;padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#c9d1d9;font-size:14px"></div>
                 <div><label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">Aantal</label><input id="calc-qty" type="number" placeholder="bijv. 70" value="1" oninput="updateCalc()" style="width:100%;padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#c9d1d9;font-size:14px"></div>
                 <div><label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">Buy Limit (optioneel)</label><input id="calc-limit" type="number" placeholder="bijv. 70" oninput="updateCalc()" style="width:100%;padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#c9d1d9;font-size:14px"></div>
             </div>
@@ -1364,12 +1364,12 @@ tr:last-child td { border-bottom:none; }
         <div class="sh t1">⚙️ Account & Filter Instellingen</div>
         <div style="padding:14px 18px 0"><label style="font-size:12px;color:#8b949e;display:block;margin-bottom:6px">Account naam (RSN)</label><input id="set-account" type="text" placeholder="Bijv. Zezima" style="width:100%;max-width:280px;padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#d29922;font-size:14px;font-weight:600"></div>
         <div class="settings-grid" id="settings-form">
-            <div><label>Kapitaal (GP)</label><input id="set-capital" type="number"></div>
+            <div><label>Kapitaal (GP)</label><input id="set-capital" type="text" placeholder="bijv. 50m"></div>
             <div><label>Max GE Slots</label><input id="set-slots" type="number"></div>
             <div><label>Min ROI %</label><input id="set-roi" type="number" step="0.1"></div>
             <div><label>Max ROI %</label><input id="set-maxroi" type="number"></div>
-            <div><label>Min Koopprijs</label><input id="set-minprice" type="number"></div>
-            <div><label>Min Winst per Trade</label><input id="set-minprofit" type="number"></div>
+            <div><label>Min Koopprijs</label><input id="set-minprice" type="text" placeholder="bijv. 100k"></div>
+            <div><label>Min Winst per Trade</label><input id="set-minprofit" type="text" placeholder="bijv. 10k"></div>
             <div><label>Min Volume</label><input id="set-minvol" type="number"></div>
             <div><label>Min Score voor Trade</label><input id="set-minscore" type="number" step="0.1"></div>
             <div><label>Refresh (sec)</label><input id="set-refresh" type="number"></div>
@@ -1478,7 +1478,7 @@ tr:last-child td { border-bottom:none; }
         <div id="buy-item-name" style="font-weight:600;margin-bottom:4px"></div>
         <div class="info" id="buy-info"></div>
         <label>Koopprijs per stuk (GP)</label>
-        <input id="buy-price" type="number" placeholder="bijv. 150000">
+        <input id="buy-price" type="text" placeholder="bijv. 150k of 1.5m">
         <label>Aantal</label>
         <input id="buy-qty" type="number" placeholder="bijv. 70">
         <div style="font-size:12px;color:#8b949e;margin-top:8px">Totaal: <b id="buy-total">0</b> GP</div>
@@ -1496,7 +1496,7 @@ tr:last-child td { border-bottom:none; }
         <div id="sell-item-name" style="font-weight:600;margin-bottom:4px"></div>
         <div class="info" id="sell-info"></div>
         <label>Verkoopprijs per stuk (GP)</label>
-        <input id="sell-price" type="number" placeholder="bijv. 180000">
+        <input id="sell-price" type="text" placeholder="bijv. 180k of 1.8m">
         <label>Aantal verkocht</label>
         <input id="sell-qty" type="number" placeholder="bijv. 70">
         <div style="font-size:12px;color:#8b949e;margin-top:8px" id="sell-calc"></div>
@@ -1565,6 +1565,19 @@ function gp(n) {
     return n.toLocaleString();
 }
 function gpExact(n) { return n != null ? Math.round(n).toLocaleString() : '?'; }
+function parseGP(v) {
+    if (typeof v === 'number') return v;
+    if (!v || typeof v !== 'string') return 0;
+    v = v.trim().replace(/,/g, '.').replace(/\s/g, '');
+    let m = v.match(/^([0-9]*\.?[0-9]+)\s*(k|m|b)?$/i);
+    if (!m) return parseFloat(v) || 0;
+    let n = parseFloat(m[1]);
+    let s = (m[2] || '').toLowerCase();
+    if (s === 'k') n *= 1000;
+    else if (s === 'm') n *= 1000000;
+    else if (s === 'b') n *= 1000000000;
+    return Math.round(n);
+}
 function trend(t) { return t==='up'?'<span class="up">↑</span>':t==='down'?'<span class="dn">↓</span>':'<span class="st">→</span>'; }
 function mom(m) { return {strong_up:'<span class="up">⬆⬆</span>',up:'<span class="up">⬆</span>',stable:'<span class="st">──</span>',down:'<span class="dn">⬇</span>',strong_down:'<span class="dn">⬇⬇</span>'}[m]||'<span class="st">?</span>'; }
 function marg(f) { if(f<=0)return'–'; let p=Math.round(f*100)+'%'; return f>=.7?`<span class="mh">${p}</span>`:f>=.4?`<span class="mm">${p}</span>`:`<span class="ml">${p}</span>`; }
@@ -1673,7 +1686,7 @@ function openBuyModal(item) {
 }
 function closeBuyModal() { document.getElementById('buy-modal').classList.remove('show'); }
 function updateBuyTotal() {
-    let p = parseInt(document.getElementById('buy-price').value) || 0;
+    let p = parseGP(document.getElementById('buy-price').value);
     let q = parseInt(document.getElementById('buy-qty').value) || 0;
     document.getElementById('buy-total').textContent = (p * q).toLocaleString();
 }
@@ -1681,7 +1694,7 @@ document.getElementById('buy-price').addEventListener('input', updateBuyTotal);
 document.getElementById('buy-qty').addEventListener('input', updateBuyTotal);
 
 async function submitBuy() {
-    let price = parseInt(document.getElementById('buy-price').value);
+    let price = parseGP(document.getElementById('buy-price').value);
     let qty = parseInt(document.getElementById('buy-qty').value);
     if (!price || !qty) return alert('Vul prijs en aantal in');
     await fetch('/api/buy', {method:'POST', headers:{'Content-Type':'application/json'},
@@ -1757,7 +1770,7 @@ function openSellModal(trade) {
 }
 function closeSellModal() { document.getElementById('sell-modal').classList.remove('show'); }
 function updateSellCalc() {
-    let sp = parseInt(document.getElementById('sell-price').value) || 0;
+    let sp = parseGP(document.getElementById('sell-price').value);
     let sq = parseInt(document.getElementById('sell-qty').value) || 0;
     if (!sp || !sq || !currentSellTrade) { document.getElementById('sell-calc').innerHTML = ''; return; }
     let rev = sp * sq;
@@ -1771,7 +1784,7 @@ document.getElementById('sell-price').addEventListener('input', updateSellCalc);
 document.getElementById('sell-qty').addEventListener('input', updateSellCalc);
 
 async function submitSell() {
-    let sp = parseInt(document.getElementById('sell-price').value);
+    let sp = parseGP(document.getElementById('sell-price').value);
     let sq = parseInt(document.getElementById('sell-qty').value);
     if (!sp || !sq) return alert('Vul prijs en aantal in');
     if (sq > currentSellTrade.quantity) return alert('Je kunt niet meer verkopen dan je hebt');
@@ -2086,12 +2099,12 @@ async function saveSettings() {
     await fetch('/api/settings', {method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({
             account_name: document.getElementById('set-account').value.trim(),
-            capital: parseInt(document.getElementById('set-capital').value),
+            capital: parseGP(document.getElementById('set-capital').value),
             max_slots: parseInt(document.getElementById('set-slots').value),
             min_roi: parseFloat(document.getElementById('set-roi').value),
             max_roi: parseInt(document.getElementById('set-maxroi').value),
-            min_buy_price: parseInt(document.getElementById('set-minprice').value),
-            min_profit_per_trade: parseInt(document.getElementById('set-minprofit').value),
+            min_buy_price: parseGP(document.getElementById('set-minprice').value),
+            min_profit_per_trade: parseGP(document.getElementById('set-minprofit').value),
             min_volume: parseInt(document.getElementById('set-minvol').value),
             min_score_for_trade: parseFloat(document.getElementById('set-minscore').value),
             refresh_seconds: parseInt(document.getElementById('set-refresh').value),
@@ -2245,8 +2258,8 @@ async function loadBolts() {
 
 // FLIP CALCULATOR
 function updateCalc() {
-    let buy = parseFloat(document.getElementById('calc-buy').value) || 0;
-    let sell = parseFloat(document.getElementById('calc-sell').value) || 0;
+    let buy = parseGP(document.getElementById('calc-buy').value);
+    let sell = parseGP(document.getElementById('calc-sell').value);
     let qty = parseInt(document.getElementById('calc-qty').value) || 1;
     let limit = parseInt(document.getElementById('calc-limit').value) || 0;
     let el = document.getElementById('calc-result');
