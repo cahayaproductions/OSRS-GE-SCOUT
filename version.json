@@ -1,6 +1,6 @@
 {
-  "version": "4.8",
-  "changelog": "Klikbare items met prijsgrafiek, tijdframes 1d-1y, gem/high/low stats",
+  "version": "4.9",
+  "changelog": "Bredere grafiek, hover tooltip met exacte prijzen, 6m/1y/all data fix",
   "files": {
     "osrs_webapp.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_webapp.py",
     "osrs_app.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_app.py"

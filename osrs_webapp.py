@@ -36,7 +36,7 @@ API_BASE = "https://prices.runescape.wiki/api/v1/osrs"
 # ─────────────────────────────────────────────
 #  AUTO-UPDATE
 # ─────────────────────────────────────────────
-APP_VERSION = "4.8"
+APP_VERSION = "4.9"
 # ⬇️ PAS DIT AAN naar je eigen GitHub repo raw URL
 UPDATE_CHECK_URL = "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/version.json"
 # Het version.json bestand op GitHub moet er zo uitzien:
@@ -961,9 +961,12 @@ def api_item_history(item_id):
     """Prijsgeschiedenis voor een item — meerdere timesteps voor verschillende periodes."""
     try:
         # Haal timeseries op met verschillende resoluties
-        ts_5m = fetch_timeseries(item_id, "5m")    # ~1 dag aan data
+        ts_5m = fetch_timeseries(item_id, "5m")    # ~1 dag
         ts_1h = fetch_timeseries(item_id, "1h")     # ~2 weken
         ts_6h = fetch_timeseries(item_id, "6h")     # ~3 maanden
+        ts_24h = []
+        try: ts_24h = fetch_timeseries(item_id, "24h")  # ~1 jaar+
+        except: pass
         # Item info
         with market_lock:
             mapping = market.get("mapping", {})
@@ -982,6 +985,7 @@ def api_item_history(item_id):
             "ts_5m": ts_5m[-300:],  # laatste ~25 uur
             "ts_1h": ts_1h,          # ~2 weken
             "ts_6h": ts_6h,          # ~3 maanden
+            "ts_24h": ts_24h,        # ~1 jaar+
         })
     except Exception as e:
         return jsonify({"error": str(e)})
@@ -1610,14 +1614,14 @@ tr:last-child td { border-bottom:none; }
 
 <!-- ITEM DETAIL MODAL -->
 <div class="modal-bg" id="detail-modal">
-    <div class="modal" style="max-width:900px;max-height:90vh;overflow-y:auto">
+    <div class="modal" style="max-width:1200px;width:95vw;max-height:90vh;overflow-y:auto">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
             <h3 id="detail-title" style="margin:0">Item Details</h3>
             <button onclick="document.getElementById('detail-modal').classList.remove('show')" style="background:none;border:none;color:#8b949e;font-size:22px;cursor:pointer">✕</button>
         </div>
         <div id="detail-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px"></div>
         <div id="detail-range-btns" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap"></div>
-        <canvas id="detail-chart" style="width:100%;height:350px;background:#0d1117;border-radius:8px"></canvas>
+        <canvas id="detail-chart" style="width:100%;height:450px;background:#0d1117;border-radius:8px"></canvas>
         <div id="detail-range-stats" style="margin-top:12px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px"></div>
     </div>
 </div>
@@ -2694,30 +2698,18 @@ function getDetailPoints() {
     if (!detailData) return [];
     let rangeObj = RANGES.find(r => r.key === detailRange);
     let cutoff = rangeObj.seconds > 0 ? (Date.now()/1000 - rangeObj.seconds) : 0;
-    // Combineer alle timeseries en filter op range
-    let all = [];
-    (detailData.ts_5m||[]).forEach(p => { if(p.timestamp >= cutoff) all.push(p); });
-    (detailData.ts_1h||[]).forEach(p => { if(p.timestamp >= cutoff) all.push(p); });
-    (detailData.ts_6h||[]).forEach(p => { if(p.timestamp >= cutoff) all.push(p); });
-    // Deduplicate op timestamp (pak de fijnste resolutie)
-    let seen = {};
-    let pts = [];
-    // Sorteer op timestamp
-    all.sort((a,b) => a.timestamp - b.timestamp);
-    for (let p of all) {
-        let key = p.timestamp;
-        if (!seen[key]) { seen[key] = true; pts.push(p); }
-    }
-    // Gebruik juiste resolutie per range
+    let pts;
     if (detailRange === '1d') {
-        // 5m data
         pts = (detailData.ts_5m||[]).filter(p => p.timestamp >= cutoff);
     } else if (detailRange === '1w' || detailRange === '14d') {
-        // 1h data
         pts = (detailData.ts_1h||[]).filter(p => p.timestamp >= cutoff);
-    } else {
-        // 6h data
+    } else if (detailRange === '1m' || detailRange === '3m') {
         pts = (detailData.ts_6h||[]).filter(p => p.timestamp >= cutoff);
+    } else {
+        // 6m, 1y, all → 24h data
+        pts = (detailData.ts_24h||[]).filter(p => p.timestamp >= cutoff);
+        // Fallback naar 6h als 24h leeg is
+        if (!pts.length) pts = (detailData.ts_6h||[]).filter(p => p.timestamp >= cutoff);
     }
     pts.sort((a,b) => a.timestamp - b.timestamp);
     return pts;
@@ -2778,88 +2770,138 @@ function renderRangeStats(pts) {
         </div>`;
 }
 
-function drawChart(pts) {
+let chartState = {};
+let hoverIdx = -1;
+
+function drawChart(pts, hoverT) {
     let canvas = document.getElementById('detail-chart');
     let ctx = canvas.getContext('2d');
     let dpr = window.devicePixelRatio || 1;
     let rect = canvas.getBoundingClientRect();
+    let H = 450;
     canvas.width = rect.width * dpr;
-    canvas.height = 350 * dpr;
-    canvas.style.height = '350px';
+    canvas.height = H * dpr;
+    canvas.style.height = H + 'px';
     ctx.scale(dpr, dpr);
-    let W = rect.width, H = 350;
+    let W = rect.width;
     ctx.clearRect(0,0,W,H);
-    ctx.fillStyle = '#0d1117';
-    ctx.fillRect(0,0,W,H);
-    if (!pts.length) {
+    ctx.fillStyle = '#0d1117'; ctx.fillRect(0,0,W,H);
+    if (!pts || !pts.length) {
         ctx.fillStyle = '#8b949e'; ctx.font = '14px sans-serif'; ctx.textAlign = 'center';
         ctx.fillText('Geen data beschikbaar voor deze periode', W/2, H/2);
-        return;
+        chartState = {}; return;
     }
-    let pad = {t:20, r:20, b:40, l:70};
+    let pad = {t:20, r:20, b:40, l:80};
     let cW = W - pad.l - pad.r, cH = H - pad.t - pad.b;
-    // Verzamel high en low series
     let highSeries = pts.map(p => ({t: p.timestamp, v: p.avgHighPrice || 0})).filter(p => p.v > 0);
     let lowSeries = pts.map(p => ({t: p.timestamp, v: p.avgLowPrice || 0})).filter(p => p.v > 0);
     let allV = [...highSeries.map(p=>p.v), ...lowSeries.map(p=>p.v)];
     if (!allV.length) {
         ctx.fillStyle = '#8b949e'; ctx.font = '14px sans-serif'; ctx.textAlign = 'center';
-        ctx.fillText('Geen prijsdata', W/2, H/2);
-        return;
+        ctx.fillText('Geen prijsdata', W/2, H/2); chartState = {}; return;
     }
     let minV = Math.min(...allV), maxV = Math.max(...allV);
     let range = maxV - minV || 1;
     minV -= range * 0.05; maxV += range * 0.05; range = maxV - minV;
     let minT = pts[0].timestamp, maxT = pts[pts.length-1].timestamp;
     let tRange = maxT - minT || 1;
-    function tx(t) { return pad.l + ((t - minT) / tRange) * cW; }
-    function ty(v) { return pad.t + cH - ((v - minV) / range) * cH; }
+    let txF = (t) => pad.l + ((t - minT) / tRange) * cW;
+    let tyF = (v) => pad.t + cH - ((v - minV) / range) * cH;
+    chartState = {pts, pad, cW, cH, W, H, minT, tRange, txF, tyF};
     // Grid
     ctx.strokeStyle = '#21262d'; ctx.lineWidth = 1;
-    for (let i = 0; i <= 4; i++) {
-        let y = pad.t + (cH / 4) * i;
+    for (let i = 0; i <= 5; i++) {
+        let y = pad.t + (cH / 5) * i;
         ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
-        let val = maxV - (range / 4) * i;
+        let val = maxV - (range / 5) * i;
         ctx.fillStyle = '#8b949e'; ctx.font = '11px sans-serif'; ctx.textAlign = 'right';
-        ctx.fillText(gp(val), pad.l - 8, y + 4);
+        ctx.fillText(gpExact(val), pad.l - 8, y + 4);
     }
     // Tijdlabels
     ctx.textAlign = 'center'; ctx.fillStyle = '#8b949e'; ctx.font = '10px sans-serif';
-    let nLabels = Math.min(6, pts.length);
+    let nLabels = Math.min(8, pts.length);
     for (let i = 0; i < nLabels; i++) {
-        let idx = Math.floor(i * (pts.length - 1) / (nLabels - 1));
-        let p = pts[idx];
-        let d = new Date(p.timestamp * 1000);
-        let label = detailRange === '1d' ? d.toLocaleTimeString('nl-NL', {hour:'2-digit',minute:'2-digit'}) :
-                    d.toLocaleDateString('nl-NL', {day:'numeric',month:'short'});
-        ctx.fillText(label, tx(p.timestamp), H - pad.b + 18);
+        let idx = Math.floor(i * (pts.length - 1) / Math.max(nLabels - 1, 1));
+        let p = pts[idx]; let d = new Date(p.timestamp * 1000);
+        let label = detailRange === '1d' ? d.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'}) :
+                    ['6m','1y','all'].includes(detailRange) ? d.toLocaleDateString('nl-NL',{month:'short',year:'2-digit'}) :
+                    d.toLocaleDateString('nl-NL',{day:'numeric',month:'short'});
+        ctx.fillText(label, txF(p.timestamp), H - pad.b + 18);
     }
-    // Teken high lijn (rood)
+    // High lijn
     if (highSeries.length > 1) {
         ctx.beginPath(); ctx.strokeStyle = '#da3633'; ctx.lineWidth = 2;
-        highSeries.forEach((p,i) => { i === 0 ? ctx.moveTo(tx(p.t), ty(p.v)) : ctx.lineTo(tx(p.t), ty(p.v)); });
+        highSeries.forEach((p,i) => { i===0 ? ctx.moveTo(txF(p.t),tyF(p.v)) : ctx.lineTo(txF(p.t),tyF(p.v)); });
         ctx.stroke();
-        // Fill onder high lijn
-        ctx.lineTo(tx(highSeries[highSeries.length-1].t), pad.t + cH);
-        ctx.lineTo(tx(highSeries[0].t), pad.t + cH);
-        ctx.closePath(); ctx.fillStyle = 'rgba(218,54,51,0.08)'; ctx.fill();
+        ctx.lineTo(txF(highSeries[highSeries.length-1].t), pad.t+cH);
+        ctx.lineTo(txF(highSeries[0].t), pad.t+cH);
+        ctx.closePath(); ctx.fillStyle='rgba(218,54,51,0.08)'; ctx.fill();
     }
-    // Teken low lijn (groen)
+    // Low lijn
     if (lowSeries.length > 1) {
         ctx.beginPath(); ctx.strokeStyle = '#3fb950'; ctx.lineWidth = 2;
-        lowSeries.forEach((p,i) => { i === 0 ? ctx.moveTo(tx(p.t), ty(p.v)) : ctx.lineTo(tx(p.t), ty(p.v)); });
+        lowSeries.forEach((p,i) => { i===0 ? ctx.moveTo(txF(p.t),tyF(p.v)) : ctx.lineTo(txF(p.t),tyF(p.v)); });
         ctx.stroke();
-        ctx.lineTo(tx(lowSeries[lowSeries.length-1].t), pad.t + cH);
-        ctx.lineTo(tx(lowSeries[0].t), pad.t + cH);
-        ctx.closePath(); ctx.fillStyle = 'rgba(63,185,80,0.08)'; ctx.fill();
+        ctx.lineTo(txF(lowSeries[lowSeries.length-1].t), pad.t+cH);
+        ctx.lineTo(txF(lowSeries[0].t), pad.t+cH);
+        ctx.closePath(); ctx.fillStyle='rgba(63,185,80,0.08)'; ctx.fill();
     }
     // Legenda
-    ctx.font = '11px sans-serif';
-    ctx.fillStyle = '#da3633'; ctx.fillRect(W - pad.r - 120, pad.t, 10, 10);
-    ctx.fillStyle = '#c9d1d9'; ctx.textAlign = 'left'; ctx.fillText('High', W - pad.r - 106, pad.t + 9);
-    ctx.fillStyle = '#3fb950'; ctx.fillRect(W - pad.r - 60, pad.t, 10, 10);
-    ctx.fillStyle = '#c9d1d9'; ctx.fillText('Low', W - pad.r - 46, pad.t + 9);
+    ctx.font='12px sans-serif';
+    ctx.fillStyle='#da3633'; ctx.fillRect(W-pad.r-140,pad.t,12,12);
+    ctx.fillStyle='#c9d1d9'; ctx.textAlign='left'; ctx.fillText('High (verkoop)',W-pad.r-124,pad.t+11);
+    ctx.fillStyle='#3fb950'; ctx.fillRect(W-pad.r-140,pad.t+20,12,12);
+    ctx.fillStyle='#c9d1d9'; ctx.fillText('Low (koop)',W-pad.r-124,pad.t+31);
+    // Hover crosshair
+    if (hoverT !== undefined && hoverT >= 0) {
+        let closest = pts.reduce((prev,curr) => Math.abs(curr.timestamp-hoverT)<Math.abs(prev.timestamp-hoverT)?curr:prev);
+        let cx = txF(closest.timestamp);
+        ctx.strokeStyle='rgba(139,148,158,0.5)'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+        ctx.beginPath(); ctx.moveTo(cx,pad.t); ctx.lineTo(cx,pad.t+cH); ctx.stroke(); ctx.setLineDash([]);
+        let hi = closest.avgHighPrice||0, lo = closest.avgLowPrice||0;
+        if(hi>0){ctx.beginPath();ctx.arc(cx,tyF(hi),5,0,Math.PI*2);ctx.fillStyle='#da3633';ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();}
+        if(lo>0){ctx.beginPath();ctx.arc(cx,tyF(lo),5,0,Math.PI*2);ctx.fillStyle='#3fb950';ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();}
+    }
 }
+
+// Tooltip setup
+(function(){
+    let tip = document.createElement('div');
+    tip.id='chart-tooltip';
+    tip.style.cssText='display:none;position:fixed;background:#161b22;border:1px solid #30363d;border-radius:8px;padding:8px 12px;color:#c9d1d9;font-size:12px;pointer-events:none;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.5)';
+    document.body.appendChild(tip);
+    document.addEventListener('mousemove', function(e){
+        let canvas = document.getElementById('detail-chart');
+        if(!canvas || !chartState.pts) return;
+        let rect = canvas.getBoundingClientRect();
+        let mx = e.clientX - rect.left, my = e.clientY - rect.top;
+        if(mx<0||mx>rect.width||my<0||my>rect.height||!chartState.pad){tip.style.display='none';return;}
+        let {pad,cW,minT,tRange,pts} = chartState;
+        if(mx < pad.l || mx > pad.l+cW){tip.style.display='none';return;}
+        let mouseT = minT + ((mx-pad.l)/cW)*tRange;
+        let closest = pts.reduce((prev,curr) => Math.abs(curr.timestamp-mouseT)<Math.abs(prev.timestamp-mouseT)?curr:prev);
+        let hi=closest.avgHighPrice||0, lo=closest.avgLowPrice||0;
+        let vol=(closest.highPriceVolume||0)+(closest.lowPriceVolume||0);
+        let d=new Date(closest.timestamp*1000);
+        let timeStr=d.toLocaleDateString('nl-NL',{day:'numeric',month:'short',year:'numeric'})+' '+d.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
+        tip.innerHTML=`<div style="color:#8b949e;margin-bottom:4px">${timeStr}</div>`+
+            (hi?`<div><span style="color:#da3633">High:</span> <b>${gpExact(hi)} GP</b></div>`:'')+
+            (lo?`<div><span style="color:#3fb950">Low:</span> <b>${gpExact(lo)} GP</b></div>`:'')+
+            (hi&&lo?`<div><span style="color:#d29922">Spread:</span> <b>${gpExact(hi-lo)} GP</b></div>`:'')+
+            (vol?`<div style="color:#8b949e">Volume: ${vol.toLocaleString()}</div>`:'');
+        tip.style.display='block';
+        tip.style.left=(e.clientX+15)+'px'; tip.style.top=(e.clientY-10)+'px';
+        drawChart(pts, mouseT);
+    });
+    document.addEventListener('mouseleave', function(){
+        document.getElementById('chart-tooltip').style.display='none';
+    });
+    let canvas = document.getElementById('detail-chart');
+    if(canvas) canvas.addEventListener('mouseleave', function(){
+        document.getElementById('chart-tooltip').style.display='none';
+        if(chartState.pts) drawChart(chartState.pts);
+    });
+})();
 
 // INIT
 async function loadVersion() {
