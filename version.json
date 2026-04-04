@@ -1,6 +1,6 @@
 {
-  "version": "5.3",
-  "changelog": "Fix: logo fallback, restart via extern script zodat app echt herstart",
+  "version": "5.4",
+  "changelog": "Logo embedded als base64 — laadt nu altijd correct",
   "files": {
     "osrs_webapp.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_webapp.py",
     "osrs_app.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_app.py"
