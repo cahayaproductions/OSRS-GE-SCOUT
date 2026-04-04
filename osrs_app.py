@@ -10,13 +10,17 @@ import threading, sys, os, signal, time, socket
 def start_server():
     """Start de Flask webapp in een achtergrond-thread."""
     os.environ["OSRS_NO_BROWSER"] = "1"
-    # Check of er een updated osrs_webapp.py in Resources staat
-    if hasattr(sys, '_MEIPASS'):
+    # Check of er updates staan in ~/.osrs_agent/updates/
+    update_dir = os.path.join(os.path.expanduser("~"), ".osrs_agent", "updates")
+    updated_webapp = os.path.join(update_dir, "osrs_webapp.py")
+    if os.path.exists(updated_webapp):
+        if update_dir not in sys.path:
+            sys.path.insert(0, update_dir)
+    # Fallback: check Resources map (voor niet-PyInstaller builds)
+    elif hasattr(sys, '_MEIPASS'):
         exe = os.path.realpath(sys.executable)
         resources = os.path.join(os.path.dirname(os.path.dirname(exe)), "Resources")
-        updated_webapp = os.path.join(resources, "osrs_webapp.py")
-        if os.path.exists(updated_webapp):
-            # Voeg Resources toe aan Python path zodat de updated versie geladen wordt
+        if os.path.exists(os.path.join(resources, "osrs_webapp.py")):
             if resources not in sys.path:
                 sys.path.insert(0, resources)
     import osrs_webapp

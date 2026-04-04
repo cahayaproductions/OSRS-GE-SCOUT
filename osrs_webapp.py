@@ -36,7 +36,7 @@ API_BASE = "https://prices.runescape.wiki/api/v1/osrs"
 # ─────────────────────────────────────────────
 #  AUTO-UPDATE
 # ─────────────────────────────────────────────
-APP_VERSION = "4.9"
+APP_VERSION = "5.0"
 # ⬇️ PAS DIT AAN naar je eigen GitHub repo raw URL
 UPDATE_CHECK_URL = "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/version.json"
 # Het version.json bestand op GitHub moet er zo uitzien:
@@ -909,27 +909,16 @@ def api_update_check():
     except:
         return jsonify({"current": APP_VERSION, "remote": None, "has_update": False, "error": "check_failed"})
 
-def _get_resources_dir():
-    """Vind de juiste map om bestanden te schrijven — werkt met PyInstaller en gewone Python."""
-    # PyInstaller: __file__ zit in _MEIPASS (read-only temp dir)
-    # De echte Resources map is via de .app bundle
-    src = Path(__file__).resolve().parent
-    # Check of we in een .app bundle zitten (Resources/ → Contents/ → .app)
-    if src.name == "Resources" and src.parent.name == "Contents":
-        return src  # Al in Resources
-    # Check of we in een PyInstaller _MEIPASS zitten
-    if hasattr(sys, '_MEIPASS'):
-        # Zoek de .app bundle via de executable
-        exe = Path(sys.executable).resolve()
-        # exe = .app/Contents/MacOS/OSRS GE Scout
-        resources = exe.parent.parent / "Resources"
-        if resources.exists():
-            return resources
-    return src  # Fallback: zelfde map als het script
+UPDATE_DIR = Path.home() / ".osrs_agent" / "updates"
+
+def _get_update_dir():
+    """Schrijfbare map voor updates — ~/.osrs_agent/updates/"""
+    UPDATE_DIR.mkdir(parents=True, exist_ok=True)
+    return UPDATE_DIR
 
 @app.route("/api/update/install", methods=["POST"])
 def api_update_install():
-    """Download en installeer de nieuwe versie. Vervangt .py bestanden."""
+    """Download en installeer de nieuwe versie naar ~/.osrs_agent/updates/."""
     try:
         r = requests.get(UPDATE_CHECK_URL, timeout=5, headers={"Cache-Control": "no-cache"})
         r.raise_for_status()
@@ -937,19 +926,14 @@ def api_update_install():
         files = remote.get("files", {})
         if not files:
             return jsonify({"ok": False, "error": "no_files"})
-        app_dir = _get_resources_dir()
+        update_dir = _get_update_dir()
         updated = []
         for fname, url in files.items():
             if not fname.endswith(".py"):
                 continue
-            target = app_dir / fname
+            target = update_dir / fname
             dl = requests.get(url, timeout=15)
             dl.raise_for_status()
-            # Backup maken
-            if target.exists():
-                backup = app_dir / f"{fname}.bak"
-                try: backup.write_bytes(target.read_bytes())
-                except: pass
             target.write_text(dl.text, encoding="utf-8")
             updated.append(fname)
         return jsonify({"ok": True, "updated": updated, "new_version": remote.get("version", "?")})
@@ -995,19 +979,20 @@ def api_update_restart():
     """Herstart de app na een update via de .app bundle."""
     import subprocess
     try:
-        app_dir = _get_resources_dir()
-        # Zoek de .app bundle
         app_bundle = None
-        # Resources → Contents → .app
-        check = app_dir.parent.parent
-        if check.suffix == ".app" and check.exists():
-            app_bundle = str(check)
         # PyInstaller: executable zit in .app/Contents/MacOS/
-        if not app_bundle and hasattr(sys, '_MEIPASS'):
+        if hasattr(sys, '_MEIPASS'):
             exe = Path(sys.executable).resolve()
-            check2 = exe.parent.parent.parent
-            if check2.suffix == ".app" and check2.exists():
-                app_bundle = str(check2)
+            check = exe.parent.parent.parent
+            if check.suffix == ".app" and check.exists():
+                app_bundle = str(check)
+        # Niet-PyInstaller: zoek .app via __file__
+        if not app_bundle:
+            p = Path(__file__).resolve()
+            for parent in [p.parent.parent.parent, p.parent.parent]:
+                if parent.suffix == ".app" and parent.exists():
+                    app_bundle = str(parent)
+                    break
         if app_bundle:
             # Herstart via 'open' zodat het icoon en menubalk correct blijven
             subprocess.Popen(
@@ -1016,9 +1001,10 @@ def api_update_restart():
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
             )
         else:
-            # Fallback: direct python starten
+            # Fallback: direct python starten vanuit update dir of huidige dir
+            run_dir = str(_get_update_dir()) if (_get_update_dir() / "osrs_app.py").exists() else str(Path(__file__).parent)
             subprocess.Popen(
-                ["bash", "-c", f'sleep 2 && cd "{app_dir}" && exec python3 osrs_app.py'],
+                ["bash", "-c", f'sleep 2 && cd "{run_dir}" && exec python3 osrs_app.py'],
                 start_new_session=True,
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
             )
