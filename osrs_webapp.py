@@ -36,7 +36,7 @@ API_BASE = "https://prices.runescape.wiki/api/v1/osrs"
 # ─────────────────────────────────────────────
 #  AUTO-UPDATE
 # ─────────────────────────────────────────────
-APP_VERSION = "5.1"
+APP_VERSION = "5.2"
 # ⬇️ PAS DIT AAN naar je eigen GitHub repo raw URL
 UPDATE_CHECK_URL = "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/version.json"
 # Het version.json bestand op GitHub moet er zo uitzien:
@@ -980,34 +980,51 @@ def api_update_restart():
     import subprocess
     try:
         app_bundle = None
-        # PyInstaller: executable zit in .app/Contents/MacOS/
+        # Methode 1: PyInstaller — sys.executable zit in .app/Contents/MacOS/
         if hasattr(sys, '_MEIPASS'):
-            exe = Path(sys.executable).resolve()
-            check = exe.parent.parent.parent
-            if check.suffix == ".app" and check.exists():
-                app_bundle = str(check)
-        # Niet-PyInstaller: zoek .app via __file__
+            exe = Path(sys.executable)
+            # Niet resolve() gebruiken — dat kan symlinks volgen en pad verliezen
+            for p in [exe.parent.parent.parent, exe.parent.parent]:
+                if p.suffix == ".app" and p.exists():
+                    app_bundle = str(p)
+                    break
+        # Methode 2: Bekende app naam in /Applications
+        if not app_bundle:
+            for name in ["OSRS GE Scout.app", "OSRS GE Scout.app"]:
+                candidate = Path("/Applications") / name
+                if candidate.exists():
+                    app_bundle = str(candidate)
+                    break
+        # Methode 3: __file__ (als we vanuit .app/Contents/Resources draaien)
         if not app_bundle:
             p = Path(__file__).resolve()
             for parent in [p.parent.parent.parent, p.parent.parent]:
                 if parent.suffix == ".app" and parent.exists():
                     app_bundle = str(parent)
                     break
+
         if app_bundle:
-            # Herstart via 'open' zodat het icoon en menubalk correct blijven
             subprocess.Popen(
                 ["bash", "-c", f'sleep 2 && open -n "{app_bundle}"'],
                 start_new_session=True,
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
             )
         else:
-            # Fallback: direct python starten vanuit update dir of huidige dir
-            run_dir = str(_get_update_dir()) if (_get_update_dir() / "osrs_app.py").exists() else str(Path(__file__).parent)
-            subprocess.Popen(
-                ["bash", "-c", f'sleep 2 && cd "{run_dir}" && exec python3 osrs_app.py'],
-                start_new_session=True,
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-            )
+            # Fallback: herstart via sys.executable (PyInstaller binary zelf)
+            if hasattr(sys, '_MEIPASS'):
+                exe_path = sys.executable
+                subprocess.Popen(
+                    ["bash", "-c", f'sleep 2 && exec "{exe_path}"'],
+                    start_new_session=True,
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                )
+            else:
+                run_dir = str(_get_update_dir()) if (_get_update_dir() / "osrs_app.py").exists() else str(Path(__file__).parent)
+                subprocess.Popen(
+                    ["bash", "-c", f'sleep 2 && cd "{run_dir}" && exec python3 osrs_app.py'],
+                    start_new_session=True,
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                )
         threading.Timer(1.0, lambda: os._exit(0)).start()
         return jsonify({"ok": True})
     except Exception as e:
@@ -2666,7 +2683,17 @@ async function doUpdate() {
             btn.style.background = '#3fb950';
             document.getElementById('update-title').innerHTML = `v${d.new_version} geinstalleerd — app herstart...`;
             document.getElementById('update-changelog').textContent = 'Bestanden bijgewerkt: ' + d.updated.join(', ');
-            setTimeout(async () => { await fetch('/api/update/restart', {method:'POST'}); }, 1500);
+            setTimeout(() => {
+                fetch('/api/update/restart', {method:'POST'}).catch(()=>{});
+                document.getElementById('update-title').innerHTML = 'App herstart... <span style="color:#8b949e">(sluit automatisch)</span>';
+                btn.textContent = 'Herstarten...';
+                // Als de app niet automatisch herstart na 8s, toon handmatige instructie
+                setTimeout(() => {
+                    document.getElementById('update-title').innerHTML = 'Update geinstalleerd! Sluit de app handmatig en open opnieuw.';
+                    btn.textContent = 'Klaar';
+                    btn.style.background = '#30363d';
+                }, 8000);
+            }, 1500);
         } else {
             btn.textContent = 'Mislukt';
             btn.style.background = '#da3633';
