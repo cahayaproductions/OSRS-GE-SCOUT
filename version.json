@@ -1,6 +1,6 @@
 {
-  "version": "5.2",
-  "changelog": "Restart fix: app herstart nu correct na update + fallback instructie",
+  "version": "5.3",
+  "changelog": "Fix: logo fallback, restart via extern script zodat app echt herstart",
   "files": {
     "osrs_webapp.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_webapp.py",
     "osrs_app.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_app.py"

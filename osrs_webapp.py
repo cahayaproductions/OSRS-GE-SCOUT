@@ -36,7 +36,7 @@ API_BASE = "https://prices.runescape.wiki/api/v1/osrs"
 # ─────────────────────────────────────────────
 #  AUTO-UPDATE
 # ─────────────────────────────────────────────
-APP_VERSION = "5.2"
+APP_VERSION = "5.3"
 # ⬇️ PAS DIT AAN naar je eigen GitHub repo raw URL
 UPDATE_CHECK_URL = "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/version.json"
 # Het version.json bestand op GitHub moet er zo uitzien:
@@ -525,12 +525,25 @@ def index(): return HTML_PAGE
 
 @app.route("/app-icon.png")
 def app_icon():
-    icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "OSRS_GE_SCOUT.png")
-    if not os.path.exists(icon_path):
-        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "osrs_icon.png")
-    if os.path.exists(icon_path):
-        from flask import send_file
-        return send_file(icon_path, mimetype="image/png")
+    from flask import send_file
+    # Zoek icon in meerdere locaties (update dir heeft geen icon)
+    search_dirs = [
+        os.path.dirname(os.path.abspath(__file__)),  # huidige dir
+    ]
+    # PyInstaller: kijk in _MEIPASS (bundled resources)
+    if hasattr(sys, '_MEIPASS'):
+        search_dirs.append(sys._MEIPASS)
+        # Ook Resources dir van de .app bundle
+        exe = os.path.realpath(sys.executable)
+        resources = os.path.join(os.path.dirname(os.path.dirname(exe)), "Resources")
+        search_dirs.append(resources)
+    # Originele app locatie (voor dev / niet-PyInstaller)
+    search_dirs.append(os.path.join(str(Path.home()), ".osrs_agent"))
+    for d in search_dirs:
+        for name in ["OSRS_GE_SCOUT.png", "osrs_icon.png"]:
+            p = os.path.join(d, name)
+            if os.path.exists(p):
+                return send_file(p, mimetype="image/png")
     return "", 404
 
 @app.route("/api/market")
@@ -977,58 +990,71 @@ def api_item_history(item_id):
 @app.route("/api/update/restart", methods=["POST"])
 def api_update_restart():
     """Herstart de app na een update via de .app bundle."""
-    import subprocess
+    import subprocess, shlex
     try:
         app_bundle = None
+        debug_info = []
+
         # Methode 1: PyInstaller — sys.executable zit in .app/Contents/MacOS/
         if hasattr(sys, '_MEIPASS'):
             exe = Path(sys.executable)
-            # Niet resolve() gebruiken — dat kan symlinks volgen en pad verliezen
+            debug_info.append(f"pyinstaller exe={exe}")
             for p in [exe.parent.parent.parent, exe.parent.parent]:
                 if p.suffix == ".app" and p.exists():
                     app_bundle = str(p)
-                    break
-        # Methode 2: Bekende app naam in /Applications
-        if not app_bundle:
-            for name in ["OSRS GE Scout.app", "OSRS GE Scout.app"]:
-                candidate = Path("/Applications") / name
-                if candidate.exists():
-                    app_bundle = str(candidate)
-                    break
-        # Methode 3: __file__ (als we vanuit .app/Contents/Resources draaien)
-        if not app_bundle:
-            p = Path(__file__).resolve()
-            for parent in [p.parent.parent.parent, p.parent.parent]:
-                if parent.suffix == ".app" and parent.exists():
-                    app_bundle = str(parent)
+                    debug_info.append(f"found via pyinstaller: {app_bundle}")
                     break
 
+        # Methode 2: Bekende app naam in /Applications
+        if not app_bundle:
+            candidate = Path("/Applications/OSRS GE Scout.app")
+            if candidate.exists():
+                app_bundle = str(candidate)
+                debug_info.append(f"found in /Applications: {app_bundle}")
+
+        debug_info.append(f"final app_bundle={app_bundle}")
+
+        # Schrijf een klein restart script dat onafhankelijk draait
+        restart_script = Path.home() / ".osrs_agent" / "_restart.sh"
+        restart_script.parent.mkdir(parents=True, exist_ok=True)
+
         if app_bundle:
-            subprocess.Popen(
-                ["bash", "-c", f'sleep 2 && open -n "{app_bundle}"'],
-                start_new_session=True,
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            restart_script.write_text(
+                f'#!/bin/bash\nsleep 3\nopen -n "{app_bundle}"\nrm -f "{restart_script}"\n',
+                encoding="utf-8"
+            )
+        elif hasattr(sys, '_MEIPASS'):
+            exe_path = sys.executable
+            restart_script.write_text(
+                f'#!/bin/bash\nsleep 3\nexec "{exe_path}"\nrm -f "{restart_script}"\n',
+                encoding="utf-8"
             )
         else:
-            # Fallback: herstart via sys.executable (PyInstaller binary zelf)
-            if hasattr(sys, '_MEIPASS'):
-                exe_path = sys.executable
-                subprocess.Popen(
-                    ["bash", "-c", f'sleep 2 && exec "{exe_path}"'],
-                    start_new_session=True,
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-                )
-            else:
-                run_dir = str(_get_update_dir()) if (_get_update_dir() / "osrs_app.py").exists() else str(Path(__file__).parent)
-                subprocess.Popen(
-                    ["bash", "-c", f'sleep 2 && cd "{run_dir}" && exec python3 osrs_app.py'],
-                    start_new_session=True,
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-                )
-        threading.Timer(1.0, lambda: os._exit(0)).start()
-        return jsonify({"ok": True})
+            run_dir = str(_get_update_dir()) if (_get_update_dir() / "osrs_app.py").exists() else str(Path(__file__).parent)
+            restart_script.write_text(
+                f'#!/bin/bash\nsleep 3\ncd "{run_dir}" && exec python3 osrs_app.py\nrm -f "{restart_script}"\n',
+                encoding="utf-8"
+            )
+
+        os.chmod(str(restart_script), 0o755)
+        # Start het script volledig los van dit proces
+        subprocess.Popen(
+            ["/bin/bash", str(restart_script)],
+            start_new_session=True,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            close_fds=True
+        )
+        debug_info.append("restart script launched")
+
+        # Geef response terug VOOR we afsluiten
+        response = jsonify({"ok": True, "debug": debug_info})
+
+        # Sluit de app na 2 seconden (script wacht 3 sec)
+        threading.Timer(2.0, lambda: os._exit(0)).start()
+        return response
     except Exception as e:
-        return jsonify({"ok": False, "error": str(e)})
+        import traceback
+        return jsonify({"ok": False, "error": str(e), "trace": traceback.format_exc()})
 
 @app.route("/api/money/alch")
 def api_money_alch():
@@ -1323,7 +1349,7 @@ tr:last-child td { border-bottom:none; }
 
 <!-- SPLASH SCREEN -->
 <div id="splash">
-    <img class="splash-icon" src="/app-icon.png" alt="OSRS GE Scout">
+    <img class="splash-icon" src="/app-icon.png" alt="OSRS GE Scout" onerror="this.onerror=null;this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjgiIGhlaWdodD0iMTI4IiB2aWV3Qm94PSIwIDAgMTI4IDEyOCI+PHJlY3Qgd2lkdGg9IjEyOCIgaGVpZ2h0PSIxMjgiIHJ4PSIyNCIgZmlsbD0iIzBkMTExNyIgc3Ryb2tlPSIjMzA2M2RkIiBzdHJva2Utd2lkdGg9IjIiLz48dGV4dCB4PSI2NCIgeT0iNTYiIGZvbnQtc2l6ZT0iMzYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiNmZmQyMDAiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIiBmb250LXdlaWdodD0iYm9sZCI+R0U8L3RleHQ+PHRleHQgeD0iNjQiIHk9Ijg2IiBmb250LXNpemU9IjE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjNThBNkZGIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiI+U0NPVVQ8L3RleHQ+PC9zdmc+'">
     <div class="splash-title">OSRS GE Scout</div>
     <div class="splash-name" id="splash-name"></div>
     <div id="splash-setup" style="display:none;text-align:center">
