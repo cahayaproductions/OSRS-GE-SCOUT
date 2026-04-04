@@ -1,6 +1,6 @@
 {
-  "version": "4.7",
-  "changelog": "GP weergave fix: volledige getallen onder 100K, 2 decimalen voor 100K+",
+  "version": "4.8",
+  "changelog": "Klikbare items met prijsgrafiek, tijdframes 1d-1y, gem/high/low stats",
   "files": {
     "osrs_webapp.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_webapp.py",
     "osrs_app.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_app.py"

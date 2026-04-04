@@ -36,7 +36,7 @@ API_BASE = "https://prices.runescape.wiki/api/v1/osrs"
 # ─────────────────────────────────────────────
 #  AUTO-UPDATE
 # ─────────────────────────────────────────────
-APP_VERSION = "4.7"
+APP_VERSION = "4.8"
 # ⬇️ PAS DIT AAN naar je eigen GitHub repo raw URL
 UPDATE_CHECK_URL = "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/version.json"
 # Het version.json bestand op GitHub moet er zo uitzien:
@@ -956,6 +956,36 @@ def api_update_install():
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)})
 
+@app.route("/api/item/<int:item_id>/history")
+def api_item_history(item_id):
+    """Prijsgeschiedenis voor een item — meerdere timesteps voor verschillende periodes."""
+    try:
+        # Haal timeseries op met verschillende resoluties
+        ts_5m = fetch_timeseries(item_id, "5m")    # ~1 dag aan data
+        ts_1h = fetch_timeseries(item_id, "1h")     # ~2 weken
+        ts_6h = fetch_timeseries(item_id, "6h")     # ~3 maanden
+        # Item info
+        with market_lock:
+            mapping = market.get("mapping", {})
+        info = mapping.get(str(item_id), {})
+        name = info.get("name", f"Item {item_id}")
+        limit = info.get("limit")
+        # Huidige prijs
+        try:
+            prices = fetch_prices()
+            current = prices.get(str(item_id), {})
+        except:
+            current = {}
+        return jsonify({
+            "id": item_id, "name": name, "limit": limit,
+            "current_high": current.get("high"), "current_low": current.get("low"),
+            "ts_5m": ts_5m[-300:],  # laatste ~25 uur
+            "ts_1h": ts_1h,          # ~2 weken
+            "ts_6h": ts_6h,          # ~3 maanden
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
 @app.route("/api/update/restart", methods=["POST"])
 def api_update_restart():
     """Herstart de app na een update via de .app bundle."""
@@ -1580,10 +1610,15 @@ tr:last-child td { border-bottom:none; }
 
 <!-- ITEM DETAIL MODAL -->
 <div class="modal-bg" id="detail-modal">
-    <div class="modal" style="max-width:600px">
-        <h3 id="detail-title">Item Details</h3>
-        <div id="detail-content" style="font-size:13px;color:#c9d1d9;line-height:1.8"></div>
-        <div class="actions"><button class="btn btn-blue btn-sm" onclick="document.getElementById('detail-modal').classList.remove('show')">Sluiten</button></div>
+    <div class="modal" style="max-width:900px;max-height:90vh;overflow-y:auto">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <h3 id="detail-title" style="margin:0">Item Details</h3>
+            <button onclick="document.getElementById('detail-modal').classList.remove('show')" style="background:none;border:none;color:#8b949e;font-size:22px;cursor:pointer">✕</button>
+        </div>
+        <div id="detail-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px"></div>
+        <div id="detail-range-btns" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap"></div>
+        <canvas id="detail-chart" style="width:100%;height:350px;background:#0d1117;border-radius:8px"></canvas>
+        <div id="detail-range-stats" style="margin-top:12px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px"></div>
     </div>
 </div>
 
@@ -1703,7 +1738,7 @@ function renderTier(el, cls, icon, label, items, tierKey) {
         let starBtn = `<span style="cursor:pointer;font-size:16px;${starCls}" onclick="toggleFav('${o.name.replace(/'/g, "\\'")}')">★</span> `;
         let roiCls = o.roi < 0 ? 'dn' : '';
         h += `<tr>
-            <td>${i+1}</td><td>${starBtn}${o.name}${dip}</td><td class="gp">${gp(o.buy_price)}</td><td class="gp">${gp(o.sell_price)}</td>
+            <td>${i+1}</td><td>${starBtn}<span style="cursor:pointer;color:#58a6ff;text-decoration:none" onclick="openItemDetail(${o.id},'${o.name.replace(/'/g,"\\'")}')">${o.name}</span>${dip}</td><td class="gp">${gp(o.buy_price)}</td><td class="gp">${gp(o.sell_price)}</td>
             <td>${limitB(o.buy_limit,o.limit_estimated)}</td><td>${o.volume.toLocaleString()}</td><td class="${roiCls}">${o.roi}%</td><td>${o.score}</td><td>${trend(o.trend)}</td>
             <td>${marg(o.margin_freq)}</td><td>${mom(o.momentum)}</td><td>${dayB(o.today_pct)}</td><td class="gp">${gp(o.profit_flip)}/flip</td>
             <td><button class="btn btn-gold btn-sm" onclick='openBuyModal(${JSON.stringify(o).replace(/'/g,"&#39;")})'>Koop</button></td></tr>`;
@@ -2615,6 +2650,215 @@ async function doUpdate() {
         btn.style.background = '#da3633';
         setTimeout(() => { btn.disabled = false; btn.textContent = 'Opnieuw proberen'; btn.style.background = '#238636'; }, 3000);
     }
+}
+
+// ── ITEM DETAIL ──
+let detailData = null;
+let detailRange = '1m';
+const RANGES = [
+    {key:'1d', label:'1 Dag', seconds:86400},
+    {key:'1w', label:'1 Week', seconds:604800},
+    {key:'14d', label:'14 Dagen', seconds:1209600},
+    {key:'1m', label:'1 Maand', seconds:2592000},
+    {key:'3m', label:'3 Maanden', seconds:7776000},
+    {key:'6m', label:'6 Maanden', seconds:15552000},
+    {key:'1y', label:'1 Jaar', seconds:31536000},
+    {key:'all', label:'Alles', seconds:0}
+];
+
+async function openItemDetail(id, name) {
+    document.getElementById('detail-title').textContent = name;
+    document.getElementById('detail-stats').innerHTML = '<div style="color:#8b949e">Laden...</div>';
+    document.getElementById('detail-range-stats').innerHTML = '';
+    document.getElementById('detail-modal').classList.add('show');
+    try {
+        let r = await fetch(`/api/item/${id}/history`);
+        detailData = await r.json();
+        renderDetailRangeButtons();
+        renderItemDetail();
+    } catch(e) {
+        document.getElementById('detail-stats').innerHTML = '<div style="color:#da3633">Fout bij laden</div>';
+    }
+}
+
+function renderDetailRangeButtons() {
+    let h = '';
+    RANGES.forEach(r => {
+        let active = r.key === detailRange ? 'background:#238636;color:#fff' : 'background:#21262d;color:#8b949e';
+        h += `<button onclick="detailRange='${r.key}';renderDetailRangeButtons();renderItemDetail()" style="${active};border:1px solid #30363d;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">${r.label}</button>`;
+    });
+    document.getElementById('detail-range-btns').innerHTML = h;
+}
+
+function getDetailPoints() {
+    if (!detailData) return [];
+    let rangeObj = RANGES.find(r => r.key === detailRange);
+    let cutoff = rangeObj.seconds > 0 ? (Date.now()/1000 - rangeObj.seconds) : 0;
+    // Combineer alle timeseries en filter op range
+    let all = [];
+    (detailData.ts_5m||[]).forEach(p => { if(p.timestamp >= cutoff) all.push(p); });
+    (detailData.ts_1h||[]).forEach(p => { if(p.timestamp >= cutoff) all.push(p); });
+    (detailData.ts_6h||[]).forEach(p => { if(p.timestamp >= cutoff) all.push(p); });
+    // Deduplicate op timestamp (pak de fijnste resolutie)
+    let seen = {};
+    let pts = [];
+    // Sorteer op timestamp
+    all.sort((a,b) => a.timestamp - b.timestamp);
+    for (let p of all) {
+        let key = p.timestamp;
+        if (!seen[key]) { seen[key] = true; pts.push(p); }
+    }
+    // Gebruik juiste resolutie per range
+    if (detailRange === '1d') {
+        // 5m data
+        pts = (detailData.ts_5m||[]).filter(p => p.timestamp >= cutoff);
+    } else if (detailRange === '1w' || detailRange === '14d') {
+        // 1h data
+        pts = (detailData.ts_1h||[]).filter(p => p.timestamp >= cutoff);
+    } else {
+        // 6h data
+        pts = (detailData.ts_6h||[]).filter(p => p.timestamp >= cutoff);
+    }
+    pts.sort((a,b) => a.timestamp - b.timestamp);
+    return pts;
+}
+
+function renderItemDetail() {
+    if (!detailData) return;
+    let d = detailData;
+    // Stats bovenaan
+    let avgHigh = d.current_high, avgLow = d.current_low;
+    let spread = avgHigh && avgLow ? avgHigh - avgLow : 0;
+    let spreadPct = avgLow > 0 ? ((spread / avgLow) * 100).toFixed(1) : '0';
+    document.getElementById('detail-stats').innerHTML = `
+        <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px;text-align:center">
+            <div style="color:#8b949e;font-size:11px">Huidige Low</div>
+            <div style="color:#3fb950;font-size:18px;font-weight:700">${avgLow ? gp(avgLow) : '?'}</div>
+        </div>
+        <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px;text-align:center">
+            <div style="color:#8b949e;font-size:11px">Huidige High</div>
+            <div style="color:#da3633;font-size:18px;font-weight:700">${avgHigh ? gp(avgHigh) : '?'}</div>
+        </div>
+        <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px;text-align:center">
+            <div style="color:#8b949e;font-size:11px">Spread</div>
+            <div style="color:#d29922;font-size:18px;font-weight:700">${gp(spread)} <span style="font-size:12px">(${spreadPct}%)</span></div>
+        </div>
+        <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px;text-align:center">
+            <div style="color:#8b949e;font-size:11px">Buy Limit</div>
+            <div style="color:#58a6ff;font-size:18px;font-weight:700">${d.limit || '?'}</div>
+        </div>`;
+    // Chart tekenen
+    let pts = getDetailPoints();
+    drawChart(pts);
+    // Range stats
+    renderRangeStats(pts);
+}
+
+function renderRangeStats(pts) {
+    if (!pts.length) { document.getElementById('detail-range-stats').innerHTML = ''; return; }
+    let highs = pts.map(p => p.avgHighPrice || p.highPrice || 0).filter(v => v > 0);
+    let lows = pts.map(p => p.avgLowPrice || p.lowPrice || 0).filter(v => v > 0);
+    let allPrices = [...highs, ...lows].filter(v => v > 0);
+    let avgAll = allPrices.length ? Math.round(allPrices.reduce((a,b)=>a+b,0) / allPrices.length) : 0;
+    let maxP = allPrices.length ? Math.max(...allPrices) : 0;
+    let minP = allPrices.length ? Math.min(...allPrices) : 0;
+    let rangeLabel = RANGES.find(r => r.key === detailRange)?.label || '';
+    document.getElementById('detail-range-stats').innerHTML = `
+        <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px;text-align:center">
+            <div style="color:#8b949e;font-size:11px">Gem. Prijs (${rangeLabel})</div>
+            <div style="color:#58a6ff;font-size:16px;font-weight:700">${gpExact(avgAll)} GP</div>
+        </div>
+        <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px;text-align:center">
+            <div style="color:#8b949e;font-size:11px">Hoogste (${rangeLabel})</div>
+            <div style="color:#da3633;font-size:16px;font-weight:700">${gpExact(maxP)} GP</div>
+        </div>
+        <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px;text-align:center">
+            <div style="color:#8b949e;font-size:11px">Laagste (${rangeLabel})</div>
+            <div style="color:#3fb950;font-size:16px;font-weight:700">${gpExact(minP)} GP</div>
+        </div>`;
+}
+
+function drawChart(pts) {
+    let canvas = document.getElementById('detail-chart');
+    let ctx = canvas.getContext('2d');
+    let dpr = window.devicePixelRatio || 1;
+    let rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = 350 * dpr;
+    canvas.style.height = '350px';
+    ctx.scale(dpr, dpr);
+    let W = rect.width, H = 350;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#0d1117';
+    ctx.fillRect(0,0,W,H);
+    if (!pts.length) {
+        ctx.fillStyle = '#8b949e'; ctx.font = '14px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('Geen data beschikbaar voor deze periode', W/2, H/2);
+        return;
+    }
+    let pad = {t:20, r:20, b:40, l:70};
+    let cW = W - pad.l - pad.r, cH = H - pad.t - pad.b;
+    // Verzamel high en low series
+    let highSeries = pts.map(p => ({t: p.timestamp, v: p.avgHighPrice || 0})).filter(p => p.v > 0);
+    let lowSeries = pts.map(p => ({t: p.timestamp, v: p.avgLowPrice || 0})).filter(p => p.v > 0);
+    let allV = [...highSeries.map(p=>p.v), ...lowSeries.map(p=>p.v)];
+    if (!allV.length) {
+        ctx.fillStyle = '#8b949e'; ctx.font = '14px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('Geen prijsdata', W/2, H/2);
+        return;
+    }
+    let minV = Math.min(...allV), maxV = Math.max(...allV);
+    let range = maxV - minV || 1;
+    minV -= range * 0.05; maxV += range * 0.05; range = maxV - minV;
+    let minT = pts[0].timestamp, maxT = pts[pts.length-1].timestamp;
+    let tRange = maxT - minT || 1;
+    function tx(t) { return pad.l + ((t - minT) / tRange) * cW; }
+    function ty(v) { return pad.t + cH - ((v - minV) / range) * cH; }
+    // Grid
+    ctx.strokeStyle = '#21262d'; ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+        let y = pad.t + (cH / 4) * i;
+        ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
+        let val = maxV - (range / 4) * i;
+        ctx.fillStyle = '#8b949e'; ctx.font = '11px sans-serif'; ctx.textAlign = 'right';
+        ctx.fillText(gp(val), pad.l - 8, y + 4);
+    }
+    // Tijdlabels
+    ctx.textAlign = 'center'; ctx.fillStyle = '#8b949e'; ctx.font = '10px sans-serif';
+    let nLabels = Math.min(6, pts.length);
+    for (let i = 0; i < nLabels; i++) {
+        let idx = Math.floor(i * (pts.length - 1) / (nLabels - 1));
+        let p = pts[idx];
+        let d = new Date(p.timestamp * 1000);
+        let label = detailRange === '1d' ? d.toLocaleTimeString('nl-NL', {hour:'2-digit',minute:'2-digit'}) :
+                    d.toLocaleDateString('nl-NL', {day:'numeric',month:'short'});
+        ctx.fillText(label, tx(p.timestamp), H - pad.b + 18);
+    }
+    // Teken high lijn (rood)
+    if (highSeries.length > 1) {
+        ctx.beginPath(); ctx.strokeStyle = '#da3633'; ctx.lineWidth = 2;
+        highSeries.forEach((p,i) => { i === 0 ? ctx.moveTo(tx(p.t), ty(p.v)) : ctx.lineTo(tx(p.t), ty(p.v)); });
+        ctx.stroke();
+        // Fill onder high lijn
+        ctx.lineTo(tx(highSeries[highSeries.length-1].t), pad.t + cH);
+        ctx.lineTo(tx(highSeries[0].t), pad.t + cH);
+        ctx.closePath(); ctx.fillStyle = 'rgba(218,54,51,0.08)'; ctx.fill();
+    }
+    // Teken low lijn (groen)
+    if (lowSeries.length > 1) {
+        ctx.beginPath(); ctx.strokeStyle = '#3fb950'; ctx.lineWidth = 2;
+        lowSeries.forEach((p,i) => { i === 0 ? ctx.moveTo(tx(p.t), ty(p.v)) : ctx.lineTo(tx(p.t), ty(p.v)); });
+        ctx.stroke();
+        ctx.lineTo(tx(lowSeries[lowSeries.length-1].t), pad.t + cH);
+        ctx.lineTo(tx(lowSeries[0].t), pad.t + cH);
+        ctx.closePath(); ctx.fillStyle = 'rgba(63,185,80,0.08)'; ctx.fill();
+    }
+    // Legenda
+    ctx.font = '11px sans-serif';
+    ctx.fillStyle = '#da3633'; ctx.fillRect(W - pad.r - 120, pad.t, 10, 10);
+    ctx.fillStyle = '#c9d1d9'; ctx.textAlign = 'left'; ctx.fillText('High', W - pad.r - 106, pad.t + 9);
+    ctx.fillStyle = '#3fb950'; ctx.fillRect(W - pad.r - 60, pad.t, 10, 10);
+    ctx.fillStyle = '#c9d1d9'; ctx.fillText('Low', W - pad.r - 46, pad.t + 9);
 }
 
 // INIT
