@@ -36,7 +36,7 @@ API_BASE = "https://prices.runescape.wiki/api/v1/osrs"
 # ─────────────────────────────────────────────
 #  AUTO-UPDATE
 # ─────────────────────────────────────────────
-APP_VERSION = "5.0"
+APP_VERSION = "5.1"
 # ⬇️ PAS DIT AAN naar je eigen GitHub repo raw URL
 UPDATE_CHECK_URL = "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/version.json"
 # Het version.json bestand op GitHub moet er zo uitzien:
@@ -1357,6 +1357,14 @@ tr:last-child td { border-bottom:none; }
 
 <!-- DASHBOARD -->
 <div class="page active" id="page-dashboard">
+    <!-- Quick Lookup -->
+    <div style="position:relative;margin-bottom:12px">
+        <input id="quick-lookup" type="text" placeholder="🔍 Quick Lookup — zoek elk item..." autocomplete="off"
+            style="width:100%;padding:10px 14px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#c9d1d9;font-size:15px;outline:none;transition:border-color .2s"
+            onfocus="this.style.borderColor='#58a6ff'" onblur="setTimeout(()=>{this.style.borderColor='#30363d';document.getElementById('ql-results').style.display='none'},200)"
+            oninput="quickLookup(this.value)">
+        <div id="ql-results" style="display:none;position:absolute;top:44px;left:0;right:0;background:#161b22;border:1px solid #30363d;border-radius:8px;max-height:320px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
+    </div>
     <div id="d-portfolio"></div>
     <div id="d-fav"></div><div id="d-bulk"></div><div id="d-tier0"></div><div id="d-tier1"></div><div id="d-tier2"></div><div id="d-tier3"></div><div id="d-tier4"></div><div id="d-tier5"></div>
 </div>
@@ -2136,6 +2144,35 @@ async function deleteHistory(idx) {
     await fetch('/api/history/delete', {method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({index: idx})});
     loadHistory();
+}
+
+// QUICK LOOKUP (dashboard)
+let qlTimer = null;
+async function quickLookup(q) {
+    clearTimeout(qlTimer);
+    let box = document.getElementById('ql-results');
+    if (q.length < 2) { box.style.display = 'none'; return; }
+    qlTimer = setTimeout(async () => {
+        try {
+            let res = await (await fetch('/api/search?q=' + encodeURIComponent(q))).json();
+            if (!res.length) { box.innerHTML = '<div style="padding:12px;color:#8b949e">Geen resultaten</div>'; box.style.display = 'block'; return; }
+            let h = '';
+            res.forEach(r => {
+                let isFav = favorites.includes(r.name);
+                let star = isFav ? 'color:#d29922' : 'color:#484f58';
+                h += `<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;cursor:pointer;border-bottom:1px solid #21262d;transition:background .15s"
+                    onmouseenter="this.style.background='#1c2333'" onmouseleave="this.style.background='none'"
+                    onclick="document.getElementById('quick-lookup').value='';document.getElementById('ql-results').style.display='none';openItemDetail(${r.id},'${r.name.replace(/'/g,"\\'")}')">
+                    <span style="font-size:16px;${star}">★</span>
+                    <span style="color:#c9d1d9;flex:1">${r.name}</span>
+                    <span style="color:#484f58;font-size:12px">Limit: ${r.limit || '?'}</span>
+                    <span style="color:#58a6ff;font-size:12px">→ Details</span>
+                </div>`;
+            });
+            box.innerHTML = h;
+            box.style.display = 'block';
+        } catch(e) { console.log('Quick lookup error:', e); }
+    }, 200);
 }
 
 // SETTINGS - SEARCH & FAVORITES
