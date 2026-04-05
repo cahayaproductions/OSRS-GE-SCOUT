@@ -36,7 +36,7 @@ API_BASE = "https://prices.runescape.wiki/api/v1/osrs"
 # ─────────────────────────────────────────────
 #  AUTO-UPDATE
 # ─────────────────────────────────────────────
-APP_VERSION = "5.5"
+APP_VERSION = "5.6"
 # ⬇️ PAS DIT AAN naar je eigen GitHub repo raw URL
 UPDATE_CHECK_URL = "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/version.json"
 # Het version.json bestand op GitHub moet er zo uitzien:
@@ -1075,10 +1075,7 @@ HERB_DATA = {
     5302: {"herb": 2485, "name": "Lantadyme",        "lvl": 73},
     5303: {"herb": 217,  "name": "Dwarf weed",       "lvl": 79},
     5304: {"herb": 219,  "name": "Torstol",          "lvl": 85},
-    22873: {"herb": 22443, "name": "Noxifer",        "lvl": 80},  # Kebos
-    22879: {"herb": 22445, "name": "Golpar",         "lvl": 82},
-    22881: {"herb": 22447, "name": "Buchu leaf",     "lvl": 84},
-    22883: {"herb": 22449, "name": "Celastrus bark", "lvl": 85},  # Celastrus is tree, skip below
+    # Noxifer, Golpar, Buchu, Celastrus — alleen in Chambers of Xeric, niet bij normale patches
 }
 
 HERB_PATCHES = [
