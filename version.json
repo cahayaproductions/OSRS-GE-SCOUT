@@ -1,6 +1,6 @@
 {
-  "version": "5.4",
-  "changelog": "Logo embedded als base64 — laadt nu altijd correct",
+  "version": "5.5",
+  "changelog": "Herb Run Calculator: live GE prijzen, patches aan/uit, compost/secateurs opties",
   "files": {
     "osrs_webapp.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_webapp.py",
     "osrs_app.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_app.py"

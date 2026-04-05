@@ -36,7 +36,7 @@ API_BASE = "https://prices.runescape.wiki/api/v1/osrs"
 # ─────────────────────────────────────────────
 #  AUTO-UPDATE
 # ─────────────────────────────────────────────
-APP_VERSION = "5.4"
+APP_VERSION = "5.5"
 # ⬇️ PAS DIT AAN naar je eigen GitHub repo raw URL
 UPDATE_CHECK_URL = "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/version.json"
 # Het version.json bestand op GitHub moet er zo uitzien:
@@ -1056,6 +1056,116 @@ def api_update_restart():
         import traceback
         return jsonify({"ok": False, "error": str(e), "trace": traceback.format_exc()})
 
+# ─────────────────────────────────────────────
+#  HERB RUN CALCULATOR
+# ─────────────────────────────────────────────
+# Seed ID → Grimy herb ID, herb name, farming level required
+HERB_DATA = {
+    5291: {"herb": 199,  "name": "Guam leaf",       "lvl": 9},
+    5292: {"herb": 201,  "name": "Marrentill",       "lvl": 14},
+    5293: {"herb": 203,  "name": "Tarromin",         "lvl": 19},
+    5294: {"herb": 205,  "name": "Harralander",      "lvl": 26},
+    5295: {"herb": 207,  "name": "Ranarr weed",      "lvl": 32},
+    5296: {"herb": 3049, "name": "Toadflax",         "lvl": 38},
+    5297: {"herb": 209,  "name": "Irit leaf",        "lvl": 44},
+    5298: {"herb": 211,  "name": "Avantoe",          "lvl": 50},
+    5299: {"herb": 213,  "name": "Kwuarm",           "lvl": 56},
+    5300: {"herb": 3051, "name": "Snapdragon",       "lvl": 62},
+    5301: {"herb": 215,  "name": "Cadantine",        "lvl": 67},
+    5302: {"herb": 2485, "name": "Lantadyme",        "lvl": 73},
+    5303: {"herb": 217,  "name": "Dwarf weed",       "lvl": 79},
+    5304: {"herb": 219,  "name": "Torstol",          "lvl": 85},
+    22873: {"herb": 22443, "name": "Noxifer",        "lvl": 80},  # Kebos
+    22879: {"herb": 22445, "name": "Golpar",         "lvl": 82},
+    22881: {"herb": 22447, "name": "Buchu leaf",     "lvl": 84},
+    22883: {"herb": 22449, "name": "Celastrus bark", "lvl": 85},  # Celastrus is tree, skip below
+}
+
+HERB_PATCHES = [
+    {"name": "Falador",        "key": "falador",     "quest": None},
+    {"name": "Catherby",       "key": "catherby",    "quest": None},
+    {"name": "Ardougne",       "key": "ardougne",    "quest": None},
+    {"name": "Port Phasmatys", "key": "phasmatys",   "quest": None},
+    {"name": "Hosidius",       "key": "hosidius",    "quest": None},
+    {"name": "Farming Guild",  "key": "guild",       "quest": "65 Farming"},
+    {"name": "Troll Stronghold","key": "troll",      "quest": "My Arm's Big Adventure"},
+    {"name": "Weiss",          "key": "weiss",       "quest": "Making Friends with My Arm"},
+    {"name": "Harmony Island", "key": "harmony",     "quest": "Elite Morytania Diary"},
+]
+
+COMPOST_IDS = {
+    "none":        None,
+    "compost":     6032,
+    "supercompost": 6034,
+    "ultracompost": 21483,
+    "bottomless":  22997,  # bottomless compost bucket (not consumed)
+}
+
+# Average yield per patch: base ~5, ultracompost ~8.7, +10% magic secateurs
+# Source: OSRS wiki herb farming
+def _herb_yield(compost="ultracompost", secateurs=True, farming_cape=False):
+    base = {"none": 5.0, "compost": 6.0, "supercompost": 7.0, "ultracompost": 8.676, "bottomless": 8.676}
+    y = base.get(compost, 8.676)
+    if secateurs:
+        y *= 1.10
+    if farming_cape:
+        y *= 1.05  # ~5% extra via cape perk
+    return round(y, 2)
+
+@app.route("/api/money/herbrun")
+def api_herb_run():
+    """Bereken winst per herb run met live GE prijzen."""
+    try:
+        prices = fetch_prices()
+        data_1h = fetch_1h()
+        try: data_5m = fetch_5m()
+        except: data_5m = {}
+
+        compost = flask_request.args.get("compost", "ultracompost")
+        secateurs = flask_request.args.get("secateurs", "true") == "true"
+        cape = flask_request.args.get("cape", "false") == "true"
+        avg_yield = _herb_yield(compost, secateurs, cape)
+
+        # Compost prijs
+        compost_price = 0
+        cid = COMPOST_IDS.get(compost)
+        if cid and compost != "bottomless":
+            compost_price = round(_best_price(cid, prices, data_1h, data_5m, "low"))
+
+        herbs = []
+        for seed_id, info in HERB_DATA.items():
+            herb_id = info["herb"]
+            seed_price = round(_best_price(seed_id, prices, data_1h, data_5m, "low"))
+            herb_price = round(_best_price(herb_id, prices, data_1h, data_5m, "high"))
+            if not seed_price or not herb_price:
+                continue
+            # Winst per patch = (yield * herb_price) - seed_price - compost_price
+            revenue_per_patch = round(avg_yield * herb_price)
+            cost_per_patch = seed_price + compost_price
+            profit_per_patch = revenue_per_patch - cost_per_patch
+            herbs.append({
+                "seed_id": seed_id,
+                "herb_id": herb_id,
+                "name": info["name"],
+                "lvl": info["lvl"],
+                "seed_price": seed_price,
+                "herb_price": herb_price,
+                "avg_yield": avg_yield,
+                "revenue_patch": revenue_per_patch,
+                "cost_patch": cost_per_patch,
+                "profit_patch": profit_per_patch,
+            })
+
+        herbs.sort(key=lambda h: h["profit_patch"], reverse=True)
+        return jsonify({
+            "herbs": herbs,
+            "avg_yield": avg_yield,
+            "compost_price": compost_price,
+            "patches": HERB_PATCHES,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e), "herbs": []})
+
 @app.route("/api/money/alch")
 def api_money_alch():
     staff = flask_request.args.get("staff", "fire")
@@ -1371,6 +1481,7 @@ tr:last-child td { border-bottom:none; }
     <button class="nav-btn" onclick="showPage('orders')">📋 Actieve Orders</button>
     <button class="nav-btn" onclick="showPage('history')">💰 Winst & Verlies</button>
     <button class="nav-btn" onclick="showPage('calc')">🧮 Calculator</button>
+    <button class="nav-btn" onclick="showPage('herbs')">🌿 Herb Runs</button>
     <button class="nav-btn" onclick="showPage('money')">💸 Money Methods</button>
     <button class="nav-btn" onclick="showPage('settings')">⚙️ Instellingen</button>
     <button class="nav-btn" onclick="showPage('guide')">📖 How To</button>
@@ -1434,6 +1545,48 @@ tr:last-child td { border-bottom:none; }
                 <div><label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">Buy Limit (optioneel)</label><input id="calc-limit" type="number" placeholder="bijv. 70" oninput="updateCalc()" style="width:100%;padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#c9d1d9;font-size:14px"></div>
             </div>
             <div id="calc-result" style="margin-top:20px;padding:18px;background:#161b22;border:1px solid #30363d;border-radius:12px;font-size:14px;color:#c9d1d9;line-height:2"></div>
+        </div>
+    </div>
+</div>
+
+<!-- HERB RUN CALCULATOR -->
+<div class="page" id="page-herbs">
+    <div class="section">
+        <div class="sh t2">🌿 Herb Run Calculator</div>
+        <div style="padding:18px">
+            <!-- Options -->
+            <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:end;margin-bottom:16px">
+                <div>
+                    <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">Compost</label>
+                    <select id="herb-compost" onchange="loadHerbRun()" style="padding:6px 12px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#c9d1d9;font-size:13px;cursor:pointer">
+                        <option value="ultracompost" selected>Ultracompost</option>
+                        <option value="supercompost">Supercompost</option>
+                        <option value="compost">Compost</option>
+                        <option value="bottomless">Bottomless bucket</option>
+                        <option value="none">Geen compost</option>
+                    </select>
+                </div>
+                <div style="display:flex;gap:16px;align-items:center">
+                    <label style="font-size:13px;color:#c9d1d9;cursor:pointer;display:flex;align-items:center;gap:6px">
+                        <input type="checkbox" id="herb-secateurs" checked onchange="loadHerbRun()" style="accent-color:#3fb950"> Magic secateurs
+                    </label>
+                    <label style="font-size:13px;color:#c9d1d9;cursor:pointer;display:flex;align-items:center;gap:6px">
+                        <input type="checkbox" id="herb-cape" onchange="loadHerbRun()" style="accent-color:#3fb950"> Farming cape
+                    </label>
+                </div>
+            </div>
+
+            <!-- Patches toggle -->
+            <div style="margin-bottom:16px">
+                <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:8px">Patches (klik om aan/uit te zetten)</label>
+                <div id="herb-patches" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+            </div>
+
+            <!-- Summary -->
+            <div id="herb-summary" style="padding:14px;background:#0d1117;border:1px solid #30363d;border-radius:10px;margin-bottom:16px;display:none"></div>
+
+            <!-- Herb table -->
+            <div id="herb-table"></div>
         </div>
     </div>
 </div>
@@ -1701,6 +1854,7 @@ function showPage(p) {
     if (p === 'orders') loadOrders();
     if (p === 'history') loadHistory();
     if (p === 'settings') loadSettings();
+    if (p === 'herbs') loadHerbRun();
     if (p === 'money') loadMoneyMethods();
 }
 
@@ -2298,6 +2452,87 @@ async function resetAccount() {
 }
 
 // MONEY METHODS
+// ── HERB RUN CALCULATOR ──
+let herbData = null;
+let herbPatches = {};
+
+function initHerbPatches(patches) {
+    let el = document.getElementById('herb-patches');
+    if (!el) return;
+    let h = '';
+    patches.forEach(p => {
+        if (herbPatches[p.key] === undefined) herbPatches[p.key] = true;
+        let on = herbPatches[p.key];
+        let quest = p.quest ? ` (${p.quest})` : '';
+        h += `<button id="patch-${p.key}" onclick="togglePatch('${p.key}')" style="padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer;border:1px solid ${on?'#238636':'#30363d'};background:${on?'#0d2818':'#161b22'};color:${on?'#3fb950':'#484f58'};transition:all .2s">${p.name}<span style="font-size:10px;color:#484f58">${quest}</span></button>`;
+    });
+    el.innerHTML = h;
+}
+
+function togglePatch(key) {
+    herbPatches[key] = !herbPatches[key];
+    renderHerbRun();
+    let btn = document.getElementById('patch-' + key);
+    if (btn) {
+        let on = herbPatches[key];
+        btn.style.border = `1px solid ${on?'#238636':'#30363d'}`;
+        btn.style.background = on?'#0d2818':'#161b22';
+        btn.style.color = on?'#3fb950':'#484f58';
+    }
+}
+
+async function loadHerbRun() {
+    let compost = document.getElementById('herb-compost').value;
+    let secateurs = document.getElementById('herb-secateurs').checked;
+    let cape = document.getElementById('herb-cape').checked;
+    try {
+        let r = await fetch(`/api/money/herbrun?compost=${compost}&secateurs=${secateurs}&cape=${cape}`);
+        herbData = await r.json();
+        if (herbData.patches) initHerbPatches(herbData.patches);
+        renderHerbRun();
+    } catch(e) { console.log('Herb run error:', e); }
+}
+
+function renderHerbRun() {
+    if (!herbData || !herbData.herbs) return;
+    let numPatches = Object.values(herbPatches).filter(v => v).length;
+    let tableEl = document.getElementById('herb-table');
+    let summaryEl = document.getElementById('herb-summary');
+
+    let h = '<table><tr><th>Lvl</th><th>Herb</th><th>Seed</th><th>Herb prijs</th><th>Opbrengst/patch</th><th>Kosten/patch</th><th>Winst/patch</th><th>Winst/run</th></tr>';
+    let bestProfit = 0;
+    let bestHerb = '';
+    herbData.herbs.forEach(herb => {
+        let runProfit = herb.profit_patch * numPatches;
+        let cls = herb.profit_patch > 0 ? 'color:#3fb950' : 'color:#da3633';
+        if (runProfit > bestProfit) { bestProfit = runProfit; bestHerb = herb.name; }
+        h += `<tr>
+            <td style="color:#484f58">${herb.lvl}</td>
+            <td><span style="cursor:pointer;color:#58a6ff" onclick="openItemDetail(${herb.herb_id},'${herb.name.replace(/'/g,"\\'")}')">${herb.name}</span></td>
+            <td class="gp">${gp(herb.seed_price)}</td>
+            <td class="gp">${gp(herb.herb_price)}</td>
+            <td class="gp">${gp(herb.revenue_patch)}</td>
+            <td class="gp">${gp(herb.cost_patch)}</td>
+            <td style="${cls};font-weight:600">${gp(herb.profit_patch)}</td>
+            <td style="${cls};font-weight:700">${gp(runProfit)}</td>
+        </tr>`;
+    });
+    h += '</table>';
+    tableEl.innerHTML = h;
+
+    // Summary
+    if (herbData.herbs.length > 0) {
+        summaryEl.style.display = 'block';
+        summaryEl.innerHTML = `
+            <div style="display:flex;flex-wrap:wrap;gap:20px;font-size:14px;color:#c9d1d9">
+                <div>🌿 <b>${numPatches}</b> patches actief</div>
+                <div>📊 Gem. opbrengst: <b>${herbData.avg_yield}</b> herbs/patch</div>
+                <div>🧪 Compost: <b>${gp(herbData.compost_price)}</b> GP/patch</div>
+                <div style="color:#3fb950;font-weight:700">💰 Beste herb: <b>${bestHerb}</b> — ${gp(bestProfit)} GP/run</div>
+            </div>`;
+    }
+}
+
 let mmMagicLevel = null;
 
 async function loadMoneyMethods() {
