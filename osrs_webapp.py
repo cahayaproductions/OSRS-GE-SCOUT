@@ -1494,7 +1494,8 @@ def api_money_planks():
                 "product_id": p["plank"], "xp": 90, "xp_hr": round(90 * rate),
                 "profit_hr": profit * rate, "afk_time": "1 min per inv"})
         results.sort(key=lambda x: x["profit"], reverse=True)
-        return jsonify({"items": results, "spell_cost": spell_cost})
+        return jsonify({"items": results, "spell_cost": spell_cost,
+            "runes": {"astral": astral, "nature": nature, "earth": earth}})
     except Exception as e:
         return jsonify({"error": str(e), "items": []})
 
@@ -1536,7 +1537,8 @@ def api_money_tan():
                 "product_id": t["leather"], "xp": 16.2, "xp_hr": round(16.2 * rate),
                 "profit_hr": round(profit * rate), "afk_time": "Click-intensive"})
         results.sort(key=lambda x: x["profit"], reverse=True)
-        return jsonify({"items": results, "spell_per_hide": round(spell_per_hide)})
+        return jsonify({"items": results, "spell_per_hide": round(spell_per_hide),
+            "runes": {"astral": astral, "nature": nature}})
     except Exception as e:
         return jsonify({"error": str(e), "items": []})
 
@@ -2204,7 +2206,7 @@ tr:last-child td { border-bottom:none; }
 
     <div class="section"><div style="padding:0 18px;cursor:pointer" onclick="toggleMmSection('cballs')"><div class="sh t1" style="margin:0;padding:10px 0">💣 Cannonballs <span id="cballs-toggle" style="font-size:12px;color:#484f58">▼</span></div></div><div id="cballs-body"><div id="cballs-table" style="padding:0 18px 18px"></div></div></div>
 
-    <div class="section"><div style="padding:0 18px;cursor:pointer" onclick="toggleMmSection('bf')"><div class="sh t2" style="margin:0;padding:10px 0">🏭 Blast Furnace <span id="bf-toggle" style="font-size:12px;color:#484f58">▼</span></div></div><div id="bf-body"><div id="bf-table" style="padding:0 18px 18px"></div></div></div>
+    <div class="section"><div style="padding:0 18px;cursor:pointer" onclick="toggleMmSection('bf')"><div class="sh t2" style="margin:0;padding:10px 0">🏭 Blast Furnace <span id="bf-toggle" style="font-size:12px;color:#484f58">▼</span></div></div><div id="bf-body"><div id="bf-info" style="padding:4px 18px;font-size:12px;color:#8b949e"></div><div id="bf-table" style="padding:0 18px 18px"></div></div></div>
 
     <!-- ═══ COOKING ═══ -->
     <div style="margin-top:16px;margin-bottom:4px;font-size:11px;font-weight:700;color:#3fb950;text-transform:uppercase;letter-spacing:1.5px;padding-left:4px">🍳 Cooking</div>
@@ -3279,7 +3281,8 @@ async function loadDhide() {
     await loadSimpleSection('/api/money/dhide', 'dhide-table', [
         {label:'Lvl', fn:i=>`<span style="color:#484f58">${i.lvl}</span>`},
         {label:'Body', fn:nameLink},
-        {label:'Kosten (3x)', fn:i=>gp(i.cost)},
+        {label:'Hide/st', fn:i=>`<span style="color:#d29922">${gp(i.hide_price)}</span>`},
+        {label:'3x Kosten', fn:i=>gp(i.cost)},
         {label:'Verkoop', fn:i=>gp(i.body_price)},
         {label:'Winst', fn:i=>gp(i.profit), style:i=>profitStyle(i)},
         {label:'GP/hr', fn:i=>gp(i.profit_hr), style:i=>profitStyle(i,'profit_hr')},
@@ -3318,7 +3321,7 @@ async function loadGlass() {
     await loadSimpleSection('/api/money/glass', 'glass-table', [
         {label:'Lvl', fn:i=>`<span style="color:#484f58">${i.lvl}</span>`},
         {label:'Item', fn:nameLink},
-        {label:'Glas', fn:i=>gp(i.glass_price)},
+        {label:'Glas', fn:i=>`<span style="color:#d29922">${gp(i.glass_price)}</span>`},
         {label:'Verkoop', fn:i=>gp(i.sell_price)},
         {label:'Winst', fn:i=>gp(i.profit), style:i=>profitStyle(i)},
         {label:'GP/hr', fn:i=>gp(i.profit_hr), style:i=>profitStyle(i,'profit_hr')},
@@ -3328,10 +3331,11 @@ async function loadGlass() {
 }
 
 async function loadStringing() {
-    await loadSimpleSection('/api/money/stringing', 'stringing-table', [
+    let d = await loadSimpleSection('/api/money/stringing', 'stringing-table', [
         {label:'Lvl', fn:i=>`<span style="color:#484f58">${i.lvl}</span>`},
         {label:'Amulet', fn:nameLink},
         {label:'Unstrung', fn:i=>gp(i.unstrung_price)},
+        {label:'Wool', fn:i=>`<span style="color:#d29922">${gp(i.wool_price)}</span>`},
         {label:'Strung', fn:i=>gp(i.strung_price)},
         {label:'Winst', fn:i=>gp(i.profit), style:i=>profitStyle(i)},
         {label:'GP/hr', fn:i=>gp(i.profit_hr), style:i=>profitStyle(i,'profit_hr')},
@@ -3346,11 +3350,13 @@ async function loadPlanks() {
     try {
         let d = await (await fetch('/api/money/planks')).json();
         if (d.error) { el.innerHTML = `<span style="color:#da3633">${d.error}</span>`; return; }
-        document.getElementById('planks-info').innerHTML = `Spell: <b>${gp(d.spell_cost)}</b> GP (2 astral + 1 nature + 15 earth) | 90 Magic XP/cast | ~1860/hr`;
+        let rn = d.runes || {};
+        document.getElementById('planks-info').innerHTML = `Spell: <b>${gp(d.spell_cost)}</b> GP/cast | Runes: Astral <b>${gp(rn.astral)}</b> · Nature <b>${gp(rn.nature)}</b> · Earth <b>${gp(rn.earth)}</b> | 90 Magic XP/cast | ~1860/hr`;
         el.innerHTML = buildSimpleTable(d.items, [
             {label:'Plank', fn:nameLink},
             {label:'Log', fn:i=>gp(i.log_price)},
-            {label:'Plank', fn:i=>gp(i.plank_price)},
+            {label:'Spell', fn:i=>`<span style="color:#d29922">${gp(i.spell_cost)}</span>`},
+            {label:'Verkoop', fn:i=>gp(i.plank_price)},
             {label:'Winst', fn:i=>gp(i.profit), style:i=>profitStyle(i)},
             {label:'GP/hr', fn:i=>gp(i.profit_hr), style:i=>profitStyle(i,'profit_hr')},
             {label:'XP/hr', fn:xpCol},
@@ -3365,10 +3371,12 @@ async function loadTan() {
     try {
         let d = await (await fetch('/api/money/tan')).json();
         if (d.error) { el.innerHTML = `<span style="color:#da3633">${d.error}</span>`; return; }
-        document.getElementById('tan-info').innerHTML = `Spell: <b>${gp(d.spell_per_hide)}</b> GP/hide (2 astral + 1 nature per 5) | 81 Magic XP/cast | ~5000 hides/hr`;
+        let rn2 = d.runes || {};
+        document.getElementById('tan-info').innerHTML = `Spell: <b>${gp(d.spell_per_hide)}</b> GP/hide (2 astral + 1 nature per 5 hides) | Runes: Astral <b>${gp(rn2.astral)}</b> · Nature <b>${gp(rn2.nature)}</b> | 81 Magic XP/cast | ~5000 hides/hr`;
         el.innerHTML = buildSimpleTable(d.items, [
             {label:'Leather', fn:nameLink},
             {label:'Hide', fn:i=>gp(i.hide_price)},
+            {label:'Spell/hide', fn:i=>`<span style="color:#d29922">${gp(i.spell_cost)}</span>`},
             {label:'Verkoop', fn:i=>gp(i.leather_price)},
             {label:'Winst', fn:i=>gp(i.profit), style:i=>profitStyle(i)},
             {label:'GP/hr', fn:i=>gp(i.profit_hr), style:i=>profitStyle(i,'profit_hr')},
@@ -3396,17 +3404,25 @@ async function loadCballs() {
 }
 
 async function loadBf() {
-    await loadSimpleSection('/api/money/blastfurnace', 'bf-table', [
-        {label:'Lvl', fn:i=>`<span style="color:#484f58">${i.lvl}</span>`},
-        {label:'Bar', fn:nameLink},
-        {label:'Ore', fn:i=>gp(i.ore_price)},
-        {label:'Coal', fn:i=>i.coal_needed ? `${i.coal_needed}x ${gp(i.coal_price)}` : '-'},
-        {label:'Bar prijs', fn:i=>gp(i.bar_price)},
-        {label:'Winst', fn:i=>gp(i.profit), style:i=>profitStyle(i)},
-        {label:'GP/hr', fn:i=>gp(i.profit_hr), style:i=>profitStyle(i,'profit_hr')},
-        {label:'XP/hr', fn:i=>{let s=i.goldsmith?'⭐ ':''; return `<span style="color:#a371f7">${s}${(i.xp_hr/1000).toFixed(1)}K</span>`;}},
-        {label:'AFK', fn:afkCol},
-    ]);
+    let el = document.getElementById('bf-table');
+    el.innerHTML = '<span style="color:#484f58">Laden...</span>';
+    try {
+        let d = await (await fetch('/api/money/blastfurnace')).json();
+        if (d.error) { el.innerHTML = `<span style="color:#da3633">${d.error}</span>`; return; }
+        document.getElementById('bf-info').innerHTML = `Coal: <b>${gp(d.coal_price)}</b> GP/st | Coffer: <b>${gp(d.coffer_cost)}</b> GP/hr (72K bij 60+ Smithing) | ${d.goldsmith ? '⭐ Goldsmith gauntlets actief' : 'Geen gauntlets'}`;
+        el.innerHTML = buildSimpleTable(d.items, [
+            {label:'Lvl', fn:i=>`<span style="color:#484f58">${i.lvl}</span>`},
+            {label:'Bar', fn:nameLink},
+            {label:'Ore', fn:i=>gp(i.ore_price)},
+            {label:'Coal', fn:i=>i.coal_needed ? `<span style="color:#d29922">${i.coal_needed}x ${gp(i.coal_price)}</span>` : '-'},
+            {label:'Verkoop', fn:i=>gp(i.bar_price)},
+            {label:'Winst', fn:i=>gp(i.profit), style:i=>profitStyle(i)},
+            {label:'Bars/hr', fn:i=>`<span style="color:#8b949e">${i.bars_hr}</span>`},
+            {label:'GP/hr', fn:i=>gp(i.profit_hr), style:i=>profitStyle(i,'profit_hr')},
+            {label:'XP/hr', fn:i=>{let s=i.goldsmith?'⭐ ':''; return `<span style="color:#a371f7">${s}${(i.xp_hr/1000).toFixed(1)}K</span>`;}},
+            {label:'AFK', fn:afkCol},
+        ]);
+    } catch(e) { el.innerHTML = '<span style="color:#da3633">Fout bij laden</span>'; }
 }
 
 async function loadCooking() {
@@ -3443,6 +3459,7 @@ async function loadFletching() {
         {label:'Lvl', fn:i=>`<span style="color:#484f58">${i.lvl}</span>`},
         {label:'Bow', fn:nameLink},
         {label:'Unstrung', fn:i=>gp(i.unstrung_price)},
+        {label:'String', fn:i=>`<span style="color:#d29922">${gp(i.string_price)}</span>`},
         {label:'Strung', fn:i=>gp(i.strung_price)},
         {label:'Winst', fn:i=>gp(i.profit), style:i=>profitStyle(i)},
         {label:'GP/hr', fn:i=>gp(i.profit_hr), style:i=>profitStyle(i,'profit_hr')},
