@@ -36,7 +36,7 @@ API_BASE = "https://prices.runescape.wiki/api/v1/osrs"
 # ─────────────────────────────────────────────
 #  AUTO-UPDATE
 # ─────────────────────────────────────────────
-APP_VERSION = "5.7"
+APP_VERSION = "5.8"
 # ⬇️ PAS DIT AAN naar je eigen GitHub repo raw URL
 UPDATE_CHECK_URL = "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/version.json"
 # Het version.json bestand op GitHub moet er zo uitzien:
@@ -1600,11 +1600,11 @@ tr:last-child td { border-bottom:none; }
             <!-- Summary -->
             <div id="herb-summary" style="padding:14px;background:#0d1117;border:1px solid #30363d;border-radius:10px;margin-bottom:16px;display:none"></div>
 
-            <!-- Route -->
-            <div id="herb-route" style="display:none;margin-bottom:16px"></div>
-
             <!-- Herb table -->
             <div id="herb-table"></div>
+
+            <!-- Route -->
+            <div id="herb-route" style="display:none;margin-top:16px"></div>
         </div>
     </div>
 </div>

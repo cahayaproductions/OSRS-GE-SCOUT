@@ -1,6 +1,6 @@
 {
-  "version": "5.7",
-  "changelog": "Herb run route planner: optimale volgorde, teleports, inventory checklist",
+  "version": "5.8",
+  "changelog": "Route planner staat nu onder de herb profit tabel",
   "files": {
     "osrs_webapp.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_webapp.py",
     "osrs_app.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_app.py"
