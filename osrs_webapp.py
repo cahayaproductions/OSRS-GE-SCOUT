@@ -1331,7 +1331,7 @@ STRING_DATA = [
     {"unstrung": 1681, "strung": 1700, "name": "Diamond amulet",     "lvl": 70, "xp": 4},
     {"unstrung": 1683, "strung": 1702, "name": "Dragonstone amulet", "lvl": 80, "xp": 4},
     {"unstrung": 6579, "strung": 6581, "name": "Onyx amulet",        "lvl": 90, "xp": 4},
-    {"unstrung": 19501, "strung": 19496, "name": "Zenyte amulet",    "lvl": 98},
+    {"unstrung": 19501, "strung": 19496, "name": "Zenyte amulet",    "lvl": 98, "xp": 4},
 ]
 BALL_OF_WOOL_ID = 1759
 
@@ -1476,7 +1476,7 @@ def api_money_planks():
             results.append({"name": p["name"], "lvl": p["lvl"], "log_price": log_price,
                 "plank_price": plank_price, "spell_cost": spell_cost, "cost": cost, "profit": profit,
                 "product_id": p["plank"], "xp": 90, "xp_hr": round(90 * rate),
-                "profit_hr": profit * rate, "afk_time": "Click-intensive"})
+                "profit_hr": profit * rate, "afk_time": "1 min per inv"})
         results.sort(key=lambda x: x["profit"], reverse=True)
         return jsonify({"items": results, "spell_cost": spell_cost})
     except Exception as e:
@@ -3215,7 +3215,7 @@ async function loadStaves() {
             </tr>`;
         });
         h += '</table>';
-        h += `<div style="margin-top:10px;font-size:12px;color:#8b949e">💡 Koop battlestaves dagelijks van Zaff in Varrock voor 7,000 GP (Elite Diary = 120/dag). Combineer met orbs (Crafting) en verkoop voor winst.</div>`;
+        h += `<div style="margin-top:10px;font-size:12px;color:#8b949e">⏱️ 30 sec per inv | 💡 Koop battlestaves dagelijks van Zaff in Varrock voor 7,000 GP (Elite Diary = 120/dag). Combineer met orbs (Crafting) en verkoop voor winst.</div>`;
         tableEl.innerHTML = h;
     } catch(e) {
         tableEl.innerHTML = '<span style="color:#da3633">Fout bij laden</span>';
@@ -3542,7 +3542,9 @@ async function loadBolts() {
             <td style="${sellVolStyle}">${b.sell_vol.toLocaleString()}</td>
             <td style="font-size:10px">${recStaff}</td></tr>`;
     });
-    tableEl.innerHTML = h + '</table>';
+    h += '</table>';
+    h += `<div style="margin-top:8px;font-size:12px;color:#8b949e">⏱️ 1-tick: Click-intensive | 10x10: ~30 sec per set</div>`;
+    tableEl.innerHTML = h;
 }
 
 // FLIP CALCULATOR
