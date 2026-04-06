@@ -1,6 +1,6 @@
 {
-  "version": "6.1",
-  "changelog": "v6.1: AFK time indicators voor alle money methods, Bow Cutting (logs → unstrung bows) toegevoegd, XP/hr data op alle skilling methodes, Cooking gauntlets + burn rates, Goldsmith gauntlets voor Blast Furnace.",
+  "version": "6.2",
+  "changelog": "v6.2: Item icons in detail modal (OSRS Wiki), AFK time fix voor staves/planks/bolts, stringing amulets XP fix.",
   "files": {
     "osrs_webapp.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_webapp.py",
     "osrs_app.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_app.py"
