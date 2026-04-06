@@ -1395,7 +1395,6 @@ JEWELRY_DATA = [
     {"product": 1664, "name": "Dragon necklace",    "lvl": 72, "gem": "Dragonstone", "gem_id": 1615},
     {"product": 6575, "name": "Onyx ring",          "lvl": 67, "gem": "Onyx",     "gem_id": 6573},
     {"product": 6577, "name": "Onyx necklace",      "lvl": 82, "gem": "Onyx",     "gem_id": 6573},
-    {"product": 11130, "name": "Binding necklace",  "lvl": 50, "gem": None,  "gem_id": None},  # Uses astral rune + cosmic rune
 ]
 
 @app.route("/api/money/jewelry")
