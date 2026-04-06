@@ -36,7 +36,7 @@ API_BASE = "https://prices.runescape.wiki/api/v1/osrs"
 # ─────────────────────────────────────────────
 #  AUTO-UPDATE
 # ─────────────────────────────────────────────
-APP_VERSION = "5.8"
+APP_VERSION = "5.9"
 # ⬇️ PAS DIT AAN naar je eigen GitHub repo raw URL
 UPDATE_CHECK_URL = "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/version.json"
 # Het version.json bestand op GitHub moet er zo uitzien:
@@ -1181,6 +1181,74 @@ def api_herb_run():
     except Exception as e:
         return jsonify({"error": str(e), "herbs": []})
 
+# ─────────────────────────────────────────────
+#  BATTLESTAFF CRAFTING CALCULATOR
+# ─────────────────────────────────────────────
+# Orb ID, Battlestaff (product) ID, crafting level, staff name
+STAVES_DATA = [
+    {"orb": 567,  "product": 1395, "name": "Water battlestaff",  "lvl": 54},
+    {"orb": 571,  "product": 1399, "name": "Earth battlestaff",  "lvl": 58},
+    {"orb": 569,  "product": 1397, "name": "Fire battlestaff",   "lvl": 62},
+    {"orb": 573,  "product": 1401, "name": "Air battlestaff",    "lvl": 66},
+]
+BATTLESTAFF_ID = 1391  # Gewone battlestaff
+
+@app.route("/api/money/staves")
+def api_money_staves():
+    """Bereken winst voor battlestaff crafting met live GE prijzen."""
+    try:
+        prices = fetch_prices()
+        data_1h = fetch_1h()
+        try: data_5m = fetch_5m()
+        except: data_5m = {}
+
+        bstaff_price = round(_best_price(BATTLESTAFF_ID, prices, data_1h, data_5m, "low"))
+        # Zaff's daily battlestaves: 7 (geen diary) tot 120 (elite Varrock diary)
+        zaff_prices = {"none": 7000, "easy": 7000, "medium": 7000, "hard": 7000, "elite": 7000}
+        # Zaff verkoopt voor 7000 GP altijd, hoeveelheid varieert
+        zaff_qty = {"none": 0, "easy": 16, "medium": 32, "hard": 64, "elite": 120}
+
+        diary = flask_request.args.get("diary", "elite")
+        daily_from_zaff = zaff_qty.get(diary, 0)
+
+        results = []
+        for s in STAVES_DATA:
+            orb_price = round(_best_price(s["orb"], prices, data_1h, data_5m, "low"))
+            sell_price = round(_best_price(s["product"], prices, data_1h, data_5m, "high"))
+            if not orb_price or not sell_price:
+                continue
+            # Winst met GE battlestaff
+            cost_ge = bstaff_price + orb_price
+            profit_ge = sell_price - cost_ge
+            # Winst met Zaff battlestaff (7000 GP)
+            cost_zaff = 7000 + orb_price
+            profit_zaff = sell_price - cost_zaff
+            results.append({
+                "name": s["name"],
+                "lvl": s["lvl"],
+                "orb_id": s["orb"],
+                "product_id": s["product"],
+                "orb_price": orb_price,
+                "bstaff_price": bstaff_price,
+                "sell_price": sell_price,
+                "cost_ge": cost_ge,
+                "profit_ge": profit_ge,
+                "cost_zaff": cost_zaff,
+                "profit_zaff": profit_zaff,
+                "daily_zaff": daily_from_zaff,
+                "daily_profit_zaff": profit_zaff * daily_from_zaff,
+            })
+        results.sort(key=lambda x: x["profit_zaff"], reverse=True)
+        return jsonify({
+            "staves": results,
+            "bstaff_price": bstaff_price,
+            "zaff_price": 7000,
+            "zaff_qty": daily_from_zaff,
+            "diary": diary,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e), "staves": []})
+
 @app.route("/api/money/alch")
 def api_money_alch():
     staff = flask_request.args.get("staff", "fire")
@@ -1617,9 +1685,9 @@ tr:last-child td { border-bottom:none; }
 
     <!-- HIGH ALCH SECTION -->
     <div class="section">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:0 18px">
-            <div class="sh t2" style="margin:0;padding:10px 0">🔥 High Alchemy</div>
-            <div style="display:flex;gap:8px;align-items:center">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:0 18px;cursor:pointer" onclick="toggleMmSection('alch')">
+            <div class="sh t2" style="margin:0;padding:10px 0">🔥 High Alchemy <span id="alch-toggle" style="font-size:12px;color:#484f58">▼</span></div>
+            <div style="display:flex;gap:8px;align-items:center" onclick="event.stopPropagation()">
                 <label style="font-size:11px;color:#8b949e">Staf:</label>
                 <select id="alch-staff" onchange="loadAlch()" style="padding:4px 10px;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:12px;cursor:pointer">
                     <option value="fire" selected>Staff of fire (aanbevolen)</option>
@@ -1628,18 +1696,20 @@ tr:last-child td { border-bottom:none; }
                 </select>
             </div>
         </div>
-        <div id="alch-info" style="padding:4px 18px;font-size:12px;color:#8b949e"></div>
-        <div style="padding:0 18px 6px"><b style="font-size:13px;color:#3fb950">📦 Bulk Items</b> <span style="font-size:11px;color:#484f58">(buy limit 1000+ — runes, bolts, supplies)</span></div>
-        <div id="alch-bulk" style="padding:0 18px 12px"></div>
-        <div style="padding:0 18px 6px"><b style="font-size:13px;color:#58a6ff">💎 High Value Items</b> <span style="font-size:11px;color:#484f58">(20K+ koopprijs)</span></div>
-        <div id="alch-highvalue" style="padding:0 18px 18px"></div>
+        <div id="alch-body">
+            <div id="alch-info" style="padding:4px 18px;font-size:12px;color:#8b949e"></div>
+            <div style="padding:0 18px 6px"><b style="font-size:13px;color:#3fb950">📦 Bulk Items</b> <span style="font-size:11px;color:#484f58">(buy limit 1000+ — runes, bolts, supplies)</span></div>
+            <div id="alch-bulk" style="padding:0 18px 12px"></div>
+            <div style="padding:0 18px 6px"><b style="font-size:13px;color:#58a6ff">💎 High Value Items</b> <span style="font-size:11px;color:#484f58">(20K+ koopprijs)</span></div>
+            <div id="alch-highvalue" style="padding:0 18px 18px"></div>
+        </div>
     </div>
 
     <!-- BOLT ENCHANT SECTION -->
     <div class="section">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:0 18px">
-            <div class="sh t3" style="margin:0;padding:10px 0">🏹 Bolt Enchanting</div>
-            <div style="display:flex;gap:8px;align-items:center">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:0 18px;cursor:pointer" onclick="toggleMmSection('bolt')">
+            <div class="sh t3" style="margin:0;padding:10px 0">🏹 Bolt Enchanting <span id="bolt-toggle" style="font-size:12px;color:#484f58">▼</span></div>
+            <div style="display:flex;gap:8px;align-items:center" onclick="event.stopPropagation()">
                 <label style="font-size:11px;color:#8b949e">Staf:</label>
                 <select id="bolt-staff" onchange="loadBolts()" style="padding:4px 10px;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:12px;cursor:pointer">
                     <option value="none">Geen staf</option>
@@ -1656,8 +1726,21 @@ tr:last-child td { border-bottom:none; }
                 </select>
             </div>
         </div>
-        <div id="bolt-info" style="padding:4px 18px;font-size:12px;color:#8b949e"></div>
-        <div id="bolt-table" style="padding:0 18px 18px"></div>
+        <div id="bolt-body">
+            <div id="bolt-info" style="padding:4px 18px;font-size:12px;color:#8b949e"></div>
+            <div id="bolt-table" style="padding:0 18px 18px"></div>
+        </div>
+    </div>
+
+    <!-- BATTLESTAFF CRAFTING SECTION -->
+    <div class="section">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:0 18px;cursor:pointer" onclick="toggleMmSection('staves')">
+            <div class="sh t1" style="margin:0;padding:10px 0">🪄 Battlestaff Crafting <span id="staves-toggle" style="font-size:12px;color:#484f58">▼</span></div>
+        </div>
+        <div id="staves-body">
+            <div id="staves-info" style="padding:4px 18px;font-size:12px;color:#8b949e"></div>
+            <div id="staves-table" style="padding:0 18px 18px"></div>
+        </div>
     </div>
 </div>
 
@@ -2609,6 +2692,20 @@ function renderHerbRun() {
 }
 
 let mmMagicLevel = null;
+let mmCollapsed = {};
+
+function toggleMmSection(key) {
+    mmCollapsed[key] = !mmCollapsed[key];
+    let body = document.getElementById(key + '-body');
+    let toggle = document.getElementById(key + '-toggle');
+    if (mmCollapsed[key]) {
+        body.style.display = 'none';
+        toggle.textContent = '▶';
+    } else {
+        body.style.display = '';
+        toggle.textContent = '▼';
+    }
+}
 
 async function loadMoneyMethods() {
     // Haal hiscores op voor magic level check
@@ -2627,6 +2724,41 @@ async function loadMoneyMethods() {
     }
     loadAlch();
     loadBolts();
+    loadStaves();
+}
+
+async function loadStaves() {
+    let infoEl = document.getElementById('staves-info');
+    let tableEl = document.getElementById('staves-table');
+    tableEl.innerHTML = '<span style="color:#484f58">Laden...</span>';
+    try {
+        let d = await (await fetch('/api/money/staves?diary=elite')).json();
+        if (d.error) { tableEl.innerHTML = `<span style="color:#da3633">${d.error}</span>`; return; }
+        if (!d.staves || !d.staves.length) { tableEl.innerHTML = '<span style="color:#484f58">Geen data</span>'; return; }
+
+        infoEl.innerHTML = `Battlestaff GE: <b>${gp(d.bstaff_price)}</b> GP | Zaff prijs: <b>7,000</b> GP | Zaff dagelijks: <b>${d.zaff_qty}</b> (Elite Varrock Diary)`;
+
+        let h = '<table><tr><th>Lvl</th><th>Staff</th><th>Orb</th><th>Verkoop</th><th>Winst (GE staff)</th><th>Winst (Zaff staff)</th><th>Dagelijks (Zaff)</th></tr>';
+        d.staves.forEach(s => {
+            let clsGe = s.profit_ge > 0 ? 'color:#3fb950' : 'color:#da3633';
+            let clsZaff = s.profit_zaff > 0 ? 'color:#3fb950' : 'color:#da3633';
+            let clsDaily = s.daily_profit_zaff > 0 ? 'color:#3fb950' : 'color:#da3633';
+            h += `<tr>
+                <td style="color:#484f58">${s.lvl}</td>
+                <td><span style="cursor:pointer;color:#58a6ff" onclick="openItemDetail(${s.product_id},'${s.name.replace(/'/g,"\\'")}')">${s.name}</span></td>
+                <td class="gp">${gp(s.orb_price)}</td>
+                <td class="gp">${gp(s.sell_price)}</td>
+                <td style="${clsGe};font-weight:600">${gp(s.profit_ge)}</td>
+                <td style="${clsZaff};font-weight:700">${gp(s.profit_zaff)}</td>
+                <td style="${clsDaily};font-weight:700">${gp(s.daily_profit_zaff)}</td>
+            </tr>`;
+        });
+        h += '</table>';
+        h += `<div style="margin-top:10px;font-size:12px;color:#8b949e">💡 Koop battlestaves dagelijks van Zaff in Varrock voor 7,000 GP (Elite Diary = 120/dag). Combineer met orbs (Crafting) en verkoop voor winst.</div>`;
+        tableEl.innerHTML = h;
+    } catch(e) {
+        tableEl.innerHTML = '<span style="color:#da3633">Fout bij laden</span>';
+    }
 }
 
 async function loadAlch() {

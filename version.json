@@ -1,6 +1,6 @@
 {
-  "version": "5.8",
-  "changelog": "Route planner staat nu onder de herb profit tabel",
+  "version": "5.9",
+  "changelog": "Money Methods: inklapbare secties + Battlestaff Crafting calculator met Zaff dagelijkse winst",
   "files": {
     "osrs_webapp.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_webapp.py",
     "osrs_app.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_app.py"
