@@ -1,6 +1,6 @@
 {
-  "version": "6.0",
-  "changelog": "Money Methods v2: gegroepeerd per skill — Magic (Alch, Bolts, Plank Make, Tan Leather), Crafting (Staves, D'hide Bodies, Gems, Jewelry, Glass, Stringing), Smithing (Cannonballs, Blast Furnace), Cooking, Fletching. Alle secties inklapbaar.",
+  "version": "6.1",
+  "changelog": "v6.1: AFK time indicators voor alle money methods, Bow Cutting (logs → unstrung bows) toegevoegd, XP/hr data op alle skilling methodes, Cooking gauntlets + burn rates, Goldsmith gauntlets voor Blast Furnace.",
   "files": {
     "osrs_webapp.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_webapp.py",
     "osrs_app.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_app.py"
