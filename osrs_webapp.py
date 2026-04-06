@@ -36,7 +36,7 @@ API_BASE = "https://prices.runescape.wiki/api/v1/osrs"
 # ─────────────────────────────────────────────
 #  AUTO-UPDATE
 # ─────────────────────────────────────────────
-APP_VERSION = "5.6"
+APP_VERSION = "5.7"
 # ⬇️ PAS DIT AAN naar je eigen GitHub repo raw URL
 UPDATE_CHECK_URL = "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/version.json"
 # Het version.json bestand op GitHub moet er zo uitzien:
@@ -1079,15 +1079,33 @@ HERB_DATA = {
 }
 
 HERB_PATCHES = [
-    {"name": "Falador",        "key": "falador",     "quest": None},
-    {"name": "Catherby",       "key": "catherby",    "quest": None},
-    {"name": "Ardougne",       "key": "ardougne",    "quest": None},
-    {"name": "Port Phasmatys", "key": "phasmatys",   "quest": None},
-    {"name": "Hosidius",       "key": "hosidius",    "quest": None},
-    {"name": "Farming Guild",  "key": "guild",       "quest": "65 Farming"},
-    {"name": "Troll Stronghold","key": "troll",      "quest": "My Arm's Big Adventure"},
-    {"name": "Weiss",          "key": "weiss",       "quest": "Making Friends with My Arm"},
-    {"name": "Harmony Island", "key": "harmony",     "quest": "Elite Morytania Diary"},
+    {"name": "Farming Guild",   "key": "guild",    "quest": "65 Farming",
+     "order": 1, "teleport": "Farming guild teleport / Jewellery box (Skills necklace)",
+     "items": ["Skills necklace / Farming guild teleport"], "tip": "Dichtbij bank — begin hier om spullen te pakken"},
+    {"name": "Hosidius",        "key": "hosidius",  "quest": None,
+     "order": 2, "teleport": "Xeric's talisman (Xeric's Glade)",
+     "items": ["Xeric's talisman"], "tip": "Loop naar het zuiden van Hosidius"},
+    {"name": "Port Phasmatys",  "key": "phasmatys", "quest": None,
+     "order": 3, "teleport": "Ectophial",
+     "items": ["Ectophial"], "tip": "Patch ten zuiden van de pub"},
+    {"name": "Harmony Island",  "key": "harmony",   "quest": "Elite Morytania Diary",
+     "order": 4, "teleport": "Harmony island teleport (portaal)",
+     "items": ["Harmony island teleport"], "tip": "Via Portal Nexus of tablet"},
+    {"name": "Ardougne",        "key": "ardougne",  "quest": None,
+     "order": 5, "teleport": "Ardougne cloak teleport / Ardougne teleport",
+     "items": ["Ardougne cloak (any)"], "tip": "Patch ten noorden van het marktplein"},
+    {"name": "Catherby",        "key": "catherby",  "quest": None,
+     "order": 6, "teleport": "Catherby teleport / Camelot teleport",
+     "items": ["Camelot teleport (tab/spellbook)"], "tip": "Camelot TP → loop oost naar patch"},
+    {"name": "Falador",         "key": "falador",   "quest": None,
+     "order": 7, "teleport": "Explorer's ring teleport / Falador teleport",
+     "items": ["Explorer's ring (any)"], "tip": "Patch ten zuiden van Falador"},
+    {"name": "Troll Stronghold", "key": "troll",    "quest": "My Arm's Big Adventure",
+     "order": 8, "teleport": "Stony basalt / Trollheim teleport",
+     "items": ["Stony basalt"], "tip": "TP naar dak Troll Stronghold → trap op naar patch. Geen compost nodig (disease-free)"},
+    {"name": "Weiss",           "key": "weiss",     "quest": "Making Friends with My Arm",
+     "order": 9, "teleport": "Icy basalt",
+     "items": ["Icy basalt"], "tip": "TP direct naast patch. Geen compost nodig (disease-free)"},
 ]
 
 COMPOST_IDS = {
@@ -1581,6 +1599,9 @@ tr:last-child td { border-bottom:none; }
 
             <!-- Summary -->
             <div id="herb-summary" style="padding:14px;background:#0d1117;border:1px solid #30363d;border-radius:10px;margin-bottom:16px;display:none"></div>
+
+            <!-- Route -->
+            <div id="herb-route" style="display:none;margin-bottom:16px"></div>
 
             <!-- Herb table -->
             <div id="herb-table"></div>
@@ -2495,6 +2516,7 @@ function renderHerbRun() {
     let numPatches = Object.values(herbPatches).filter(v => v).length;
     let tableEl = document.getElementById('herb-table');
     let summaryEl = document.getElementById('herb-summary');
+    let routeEl = document.getElementById('herb-route');
 
     let h = '<table><tr><th>Lvl</th><th>Herb</th><th>Seed</th><th>Herb prijs</th><th>Opbrengst/patch</th><th>Kosten/patch</th><th>Winst/patch</th><th>Winst/run</th></tr>';
     let bestProfit = 0;
@@ -2528,6 +2550,62 @@ function renderHerbRun() {
                 <div style="color:#3fb950;font-weight:700">💰 Beste herb: <b>${bestHerb}</b> — ${gp(bestProfit)} GP/run</div>
             </div>`;
     }
+
+    // Route
+    if (!herbData.patches) { routeEl.style.display = 'none'; return; }
+    let activePatches = herbData.patches
+        .filter(p => herbPatches[p.key])
+        .sort((a, b) => a.order - b.order);
+
+    if (activePatches.length === 0) { routeEl.style.display = 'none'; return; }
+    routeEl.style.display = 'block';
+
+    // Collect all unique items needed
+    let allItems = [];
+    activePatches.forEach(p => { if (p.items) p.items.forEach(it => { if (!allItems.includes(it)) allItems.push(it); }); });
+
+    let compostType = document.getElementById('herb-compost').value;
+    let compostName = {none:'Geen', compost:'Compost', supercompost:'Supercompost', ultracompost:'Ultracompost', bottomless:'Bottomless compost bucket'}[compostType] || compostType;
+    let secateurs = document.getElementById('herb-secateurs').checked;
+
+    let rh = `<div class="section" style="margin:0"><div class="sh t3">🗺️ Route & Inventory</div><div style="padding:14px">`;
+
+    // Inventory checklist
+    rh += `<div style="margin-bottom:16px;padding:12px;background:#0d1117;border:1px solid #30363d;border-radius:8px">`;
+    rh += `<div style="font-size:13px;font-weight:600;color:#d29922;margin-bottom:8px">🎒 Inventory Checklist</div>`;
+    rh += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;font-size:13px;color:#c9d1d9">`;
+    rh += `<div>🌱 ${activePatches.length}x Herb seed (keuze)</div>`;
+    rh += `<div>🧰 Seed dibber</div>`;
+    rh += `<div>🔧 Spade</div>`;
+    if (secateurs) rh += `<div>✂️ Magic secateurs (equipped)</div>`;
+    if (compostType !== 'none') rh += `<div>🧪 ${compostType === 'bottomless' ? 'Bottomless compost bucket' : activePatches.length + 'x ' + compostName}</div>`;
+    rh += `<div>💰 GP voor teleports</div>`;
+    allItems.forEach(it => { rh += `<div>🔮 ${it}</div>`; });
+    rh += `</div></div>`;
+
+    // Route steps
+    rh += `<div style="font-size:13px;font-weight:600;color:#58a6ff;margin-bottom:10px">📍 Optimale Route (${activePatches.length} stops)</div>`;
+    activePatches.forEach((p, i) => {
+        let isLast = i === activePatches.length - 1;
+        let diseaseFree = (p.key === 'troll' || p.key === 'weiss');
+        rh += `<div style="display:flex;gap:12px;margin-bottom:${isLast?'0':'4'}px">`;
+        // Timeline
+        rh += `<div style="display:flex;flex-direction:column;align-items:center;min-width:28px">`;
+        rh += `<div style="width:28px;height:28px;border-radius:50%;background:${i===0?'#238636':'#30363d'};color:${i===0?'#fff':'#8b949e'};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700">${i+1}</div>`;
+        if (!isLast) rh += `<div style="width:2px;flex:1;background:#21262d;margin:4px 0"></div>`;
+        rh += `</div>`;
+        // Content
+        rh += `<div style="flex:1;padding-bottom:${isLast?'0':'14'}px">`;
+        rh += `<div style="font-size:14px;font-weight:600;color:#c9d1d9">${p.name}</div>`;
+        rh += `<div style="font-size:12px;color:#8b949e;margin-top:2px">🔮 ${p.teleport}</div>`;
+        if (p.tip) rh += `<div style="font-size:12px;color:#6e7681;margin-top:2px;font-style:italic">${p.tip}</div>`;
+        if (diseaseFree) rh += `<div style="font-size:11px;color:#3fb950;margin-top:2px">✅ Disease-free — geen compost nodig</div>`;
+        if (p.quest) rh += `<div style="font-size:11px;color:#d29922;margin-top:2px">⚠️ Vereist: ${p.quest}</div>`;
+        rh += `</div></div>`;
+    });
+
+    rh += `</div></div>`;
+    routeEl.innerHTML = rh;
 }
 
 let mmMagicLevel = null;

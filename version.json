@@ -1,6 +1,6 @@
 {
-  "version": "5.6",
-  "changelog": "Verwijder Kebos herbs (Noxifer, Golpar, Buchu, Celastrus) uit herb run calculator",
+  "version": "5.7",
+  "changelog": "Herb run route planner: optimale volgorde, teleports, inventory checklist",
   "files": {
     "osrs_webapp.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_webapp.py",
     "osrs_app.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_app.py"
