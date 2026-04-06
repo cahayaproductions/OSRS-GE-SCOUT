@@ -1,6 +1,6 @@
 {
-  "version": "5.9",
-  "changelog": "Money Methods: inklapbare secties + Battlestaff Crafting calculator met Zaff dagelijkse winst",
+  "version": "6.0",
+  "changelog": "Money Methods v2: gegroepeerd per skill — Magic (Alch, Bolts, Plank Make, Tan Leather), Crafting (Staves, D'hide Bodies, Gems, Jewelry, Glass, Stringing), Smithing (Cannonballs, Blast Furnace), Cooking, Fletching. Alle secties inklapbaar.",
   "files": {
     "osrs_webapp.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_webapp.py",
     "osrs_app.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_app.py"

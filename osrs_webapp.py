@@ -36,7 +36,7 @@ API_BASE = "https://prices.runescape.wiki/api/v1/osrs"
 # ─────────────────────────────────────────────
 #  AUTO-UPDATE
 # ─────────────────────────────────────────────
-APP_VERSION = "5.9"
+APP_VERSION = "6.0"
 # ⬇️ PAS DIT AAN naar je eigen GitHub repo raw URL
 UPDATE_CHECK_URL = "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/version.json"
 # Het version.json bestand op GitHub moet er zo uitzien:
@@ -1249,6 +1249,405 @@ def api_money_staves():
     except Exception as e:
         return jsonify({"error": str(e), "staves": []})
 
+# ─────────────────────────────────────────────
+#  DRAGONHIDE BODIES
+# ─────────────────────────────────────────────
+DHIDE_DATA = [
+    {"hide": 1745, "body": 1135, "name": "Green d'hide body",  "lvl": 63, "hides": 3},
+    {"hide": 2505, "body": 2499, "name": "Blue d'hide body",   "lvl": 71, "hides": 3},
+    {"hide": 2507, "body": 2501, "name": "Red d'hide body",    "lvl": 77, "hides": 3},
+    {"hide": 2509, "body": 2503, "name": "Black d'hide body",  "lvl": 84, "hides": 3},
+]
+
+@app.route("/api/money/dhide")
+def api_money_dhide():
+    try:
+        prices = fetch_prices(); data_1h = fetch_1h()
+        try: data_5m = fetch_5m()
+        except: data_5m = {}
+        results = []
+        for d in DHIDE_DATA:
+            hide_price = round(_best_price(d["hide"], prices, data_1h, data_5m, "low"))
+            body_price = round(_best_price(d["body"], prices, data_1h, data_5m, "high"))
+            if not hide_price or not body_price: continue
+            cost = hide_price * d["hides"]
+            profit = body_price - cost
+            results.append({"name": d["name"], "lvl": d["lvl"], "hide_price": hide_price,
+                "body_price": body_price, "cost": cost, "profit": profit,
+                "product_id": d["body"], "hides_needed": d["hides"],
+                "profit_hr": profit * 1500})  # ~1500 bodies/hr
+        results.sort(key=lambda x: x["profit"], reverse=True)
+        return jsonify({"items": results})
+    except Exception as e:
+        return jsonify({"error": str(e), "items": []})
+
+# ─────────────────────────────────────────────
+#  GEM CUTTING
+# ─────────────────────────────────────────────
+GEM_DATA = [
+    {"uncut": 1623, "cut": 1607, "name": "Sapphire",     "lvl": 20},
+    {"uncut": 1621, "cut": 1605, "name": "Emerald",      "lvl": 27},
+    {"uncut": 1619, "cut": 1603, "name": "Ruby",         "lvl": 63},
+    {"uncut": 1617, "cut": 1601, "name": "Diamond",      "lvl": 43},
+    {"uncut": 1631, "cut": 1615, "name": "Dragonstone",  "lvl": 55},
+    {"uncut": 6571, "cut": 6573, "name": "Onyx",         "lvl": 67},
+    {"uncut": 19496, "cut": 19493, "name": "Zenyte",     "lvl": 89},
+]
+
+@app.route("/api/money/gems")
+def api_money_gems():
+    try:
+        prices = fetch_prices(); data_1h = fetch_1h()
+        try: data_5m = fetch_5m()
+        except: data_5m = {}
+        results = []
+        for g in GEM_DATA:
+            uncut_price = round(_best_price(g["uncut"], prices, data_1h, data_5m, "low"))
+            cut_price = round(_best_price(g["cut"], prices, data_1h, data_5m, "high"))
+            if not uncut_price or not cut_price: continue
+            profit = cut_price - uncut_price
+            results.append({"name": g["name"], "lvl": g["lvl"], "uncut_price": uncut_price,
+                "cut_price": cut_price, "profit": profit,
+                "product_id": g["cut"],
+                "profit_hr": profit * 2700})  # ~2700 cuts/hr
+        results.sort(key=lambda x: x["profit"], reverse=True)
+        return jsonify({"items": results})
+    except Exception as e:
+        return jsonify({"error": str(e), "items": []})
+
+# ─────────────────────────────────────────────
+#  STRINGING AMULETS
+# ─────────────────────────────────────────────
+STRING_DATA = [
+    {"unstrung": 1673, "strung": 1692, "name": "Gold amulet",        "lvl": 8},
+    {"unstrung": 1675, "strung": 1694, "name": "Sapphire amulet",    "lvl": 24},
+    {"unstrung": 1677, "strung": 1696, "name": "Emerald amulet",     "lvl": 31},
+    {"unstrung": 1679, "strung": 1698, "name": "Ruby amulet",        "lvl": 50},
+    {"unstrung": 1681, "strung": 1700, "name": "Diamond amulet",     "lvl": 70},
+    {"unstrung": 1683, "strung": 1702, "name": "Dragonstone amulet", "lvl": 80},
+    {"unstrung": 6579, "strung": 6581, "name": "Onyx amulet",        "lvl": 90},
+    {"unstrung": 19501, "strung": 19496, "name": "Zenyte amulet",    "lvl": 98},
+]
+BALL_OF_WOOL_ID = 1759
+
+@app.route("/api/money/stringing")
+def api_money_stringing():
+    try:
+        prices = fetch_prices(); data_1h = fetch_1h()
+        try: data_5m = fetch_5m()
+        except: data_5m = {}
+        wool_price = round(_best_price(BALL_OF_WOOL_ID, prices, data_1h, data_5m, "low"))
+        results = []
+        for s in STRING_DATA:
+            unstrung_price = round(_best_price(s["unstrung"], prices, data_1h, data_5m, "low"))
+            strung_price = round(_best_price(s["strung"], prices, data_1h, data_5m, "high"))
+            if not unstrung_price or not strung_price: continue
+            cost = unstrung_price + wool_price
+            profit = strung_price - cost
+            results.append({"name": s["name"], "lvl": s["lvl"], "unstrung_price": unstrung_price,
+                "strung_price": strung_price, "wool_price": wool_price, "cost": cost, "profit": profit,
+                "product_id": s["strung"],
+                "profit_hr": profit * 2700})  # ~2700 strings/hr
+        results.sort(key=lambda x: x["profit"], reverse=True)
+        return jsonify({"items": results, "wool_price": wool_price})
+    except Exception as e:
+        return jsonify({"error": str(e), "items": []})
+
+# ─────────────────────────────────────────────
+#  GOLD JEWELRY
+# ─────────────────────────────────────────────
+GOLD_BAR_ID = 2357
+JEWELRY_DATA = [
+    {"product": 1635, "name": "Gold ring",          "lvl": 5,  "gem": None,  "gem_id": None},
+    {"product": 1654, "name": "Gold necklace",      "lvl": 6,  "gem": None,  "gem_id": None},
+    {"product": 1637, "name": "Sapphire ring",      "lvl": 20, "gem": "Sapphire", "gem_id": 1607},
+    {"product": 1656, "name": "Sapphire necklace",  "lvl": 22, "gem": "Sapphire", "gem_id": 1607},
+    {"product": 1639, "name": "Emerald ring",       "lvl": 27, "gem": "Emerald",  "gem_id": 1605},
+    {"product": 1658, "name": "Emerald necklace",   "lvl": 29, "gem": "Emerald",  "gem_id": 1605},
+    {"product": 1641, "name": "Ruby ring",          "lvl": 34, "gem": "Ruby",     "gem_id": 1603},
+    {"product": 1660, "name": "Ruby necklace",      "lvl": 40, "gem": "Ruby",     "gem_id": 1603},
+    {"product": 1643, "name": "Diamond ring",       "lvl": 43, "gem": "Diamond",  "gem_id": 1601},
+    {"product": 1662, "name": "Diamond necklace",   "lvl": 56, "gem": "Diamond",  "gem_id": 1601},
+    {"product": 1645, "name": "Dragonstone ring",   "lvl": 55, "gem": "Dragonstone", "gem_id": 1615},
+    {"product": 1664, "name": "Dragon necklace",    "lvl": 72, "gem": "Dragonstone", "gem_id": 1615},
+    {"product": 6575, "name": "Onyx ring",          "lvl": 67, "gem": "Onyx",     "gem_id": 6573},
+    {"product": 6577, "name": "Onyx necklace",      "lvl": 82, "gem": "Onyx",     "gem_id": 6573},
+    {"product": 11130, "name": "Binding necklace",  "lvl": 50, "gem": None,  "gem_id": None},  # Uses astral rune + cosmic rune
+]
+
+@app.route("/api/money/jewelry")
+def api_money_jewelry():
+    try:
+        prices = fetch_prices(); data_1h = fetch_1h()
+        try: data_5m = fetch_5m()
+        except: data_5m = {}
+        gold_price = round(_best_price(GOLD_BAR_ID, prices, data_1h, data_5m, "low"))
+        results = []
+        for j in JEWELRY_DATA:
+            sell_price = round(_best_price(j["product"], prices, data_1h, data_5m, "high"))
+            if not sell_price: continue
+            gem_price = 0
+            if j["gem_id"]:
+                gem_price = round(_best_price(j["gem_id"], prices, data_1h, data_5m, "low"))
+                if not gem_price: continue
+            cost = gold_price + gem_price
+            profit = sell_price - cost
+            results.append({"name": j["name"], "lvl": j["lvl"], "gold_price": gold_price,
+                "gem": j["gem"] or "Geen", "gem_price": gem_price,
+                "sell_price": sell_price, "cost": cost, "profit": profit,
+                "product_id": j["product"],
+                "profit_hr": profit * 1800})  # ~1800/hr at furnace
+        results.sort(key=lambda x: x["profit"], reverse=True)
+        return jsonify({"items": results, "gold_price": gold_price})
+    except Exception as e:
+        return jsonify({"error": str(e), "items": []})
+
+# ─────────────────────────────────────────────
+#  GLASS BLOWING
+# ─────────────────────────────────────────────
+MOLTEN_GLASS_ID = 1775
+GLASS_DATA = [
+    {"product": 567,  "name": "Unpowered orb",     "lvl": 46},
+    {"product": 229,  "name": "Vial",               "lvl": 33},
+    {"product": 4527, "name": "Lantern lens",       "lvl": 49},
+    {"product": 10980, "name": "Empty light orb",   "lvl": 87},
+]
+
+@app.route("/api/money/glass")
+def api_money_glass():
+    try:
+        prices = fetch_prices(); data_1h = fetch_1h()
+        try: data_5m = fetch_5m()
+        except: data_5m = {}
+        glass_price = round(_best_price(MOLTEN_GLASS_ID, prices, data_1h, data_5m, "low"))
+        results = []
+        for g in GLASS_DATA:
+            sell_price = round(_best_price(g["product"], prices, data_1h, data_5m, "high"))
+            if not sell_price: continue
+            profit = sell_price - glass_price
+            results.append({"name": g["name"], "lvl": g["lvl"], "glass_price": glass_price,
+                "sell_price": sell_price, "profit": profit,
+                "product_id": g["product"],
+                "profit_hr": profit * 1800})  # ~1800/hr
+        results.sort(key=lambda x: x["profit"], reverse=True)
+        return jsonify({"items": results, "glass_price": glass_price})
+    except Exception as e:
+        return jsonify({"error": str(e), "items": []})
+
+# ─────────────────────────────────────────────
+#  PLANK MAKE (Magic - Lunar)
+# ─────────────────────────────────────────────
+PLANK_DATA = [
+    {"log": 1511, "plank": 960,   "name": "Plank",          "npc_cost": 100,  "lvl": 86},
+    {"log": 1521, "plank": 8778,  "name": "Oak plank",      "npc_cost": 250,  "lvl": 86},
+    {"log": 1519, "plank": 8780,  "name": "Teak plank",     "npc_cost": 500,  "lvl": 86},
+    {"log": 1513, "plank": 8782,  "name": "Mahogany plank", "npc_cost": 1500, "lvl": 86},
+]
+# Plank Make spell: 2 astral + 1 nature + 15 earth runes
+ASTRAL_RUNE_ID = 9075
+NATURE_RUNE_ID = 561
+EARTH_RUNE_ID = 557
+
+@app.route("/api/money/planks")
+def api_money_planks():
+    try:
+        prices = fetch_prices(); data_1h = fetch_1h()
+        try: data_5m = fetch_5m()
+        except: data_5m = {}
+        astral = round(_best_price(ASTRAL_RUNE_ID, prices, data_1h, data_5m, "low"))
+        nature = round(_best_price(NATURE_RUNE_ID, prices, data_1h, data_5m, "low"))
+        earth = round(_best_price(EARTH_RUNE_ID, prices, data_1h, data_5m, "low"))
+        spell_cost = (astral * 2) + nature + (earth * 15)
+        results = []
+        for p in PLANK_DATA:
+            log_price = round(_best_price(p["log"], prices, data_1h, data_5m, "low"))
+            plank_price = round(_best_price(p["plank"], prices, data_1h, data_5m, "high"))
+            if not log_price or not plank_price: continue
+            cost = log_price + spell_cost
+            profit = plank_price - cost
+            results.append({"name": p["name"], "lvl": p["lvl"], "log_price": log_price,
+                "plank_price": plank_price, "spell_cost": spell_cost, "cost": cost, "profit": profit,
+                "product_id": p["plank"], "profit_hr": profit * 1860})  # ~1860 casts/hr
+        results.sort(key=lambda x: x["profit"], reverse=True)
+        return jsonify({"items": results, "spell_cost": spell_cost})
+    except Exception as e:
+        return jsonify({"error": str(e), "items": []})
+
+# ─────────────────────────────────────────────
+#  TAN LEATHER (Magic - Lunar)
+# ─────────────────────────────────────────────
+TAN_DATA = [
+    {"hide": 1739, "leather": 1741, "name": "Soft leather",       "lvl": 78},
+    {"hide": 1739, "leather": 1743, "name": "Hard leather",       "lvl": 78},
+    {"hide": 1753, "leather": 1745, "name": "Green d'hide leather","lvl": 78},
+    {"hide": 1751, "leather": 2505, "name": "Blue d'hide leather", "lvl": 78},
+    {"hide": 1749, "leather": 2507, "name": "Red d'hide leather",  "lvl": 78},
+    {"hide": 1747, "leather": 2509, "name": "Black d'hide leather","lvl": 78},
+]
+# Tan Leather: 2 astral + 1 nature per 5 hides
+
+@app.route("/api/money/tan")
+def api_money_tan():
+    try:
+        prices = fetch_prices(); data_1h = fetch_1h()
+        try: data_5m = fetch_5m()
+        except: data_5m = {}
+        astral = round(_best_price(ASTRAL_RUNE_ID, prices, data_1h, data_5m, "low"))
+        nature = round(_best_price(NATURE_RUNE_ID, prices, data_1h, data_5m, "low"))
+        spell_cost_per5 = (astral * 2) + nature  # tans 5 hides per cast
+        spell_per_hide = spell_cost_per5 / 5
+        results = []
+        for t in TAN_DATA:
+            hide_price = round(_best_price(t["hide"], prices, data_1h, data_5m, "low"))
+            leather_price = round(_best_price(t["leather"], prices, data_1h, data_5m, "high"))
+            if not hide_price or not leather_price: continue
+            cost = hide_price + spell_per_hide
+            profit = leather_price - cost
+            results.append({"name": t["name"], "lvl": t["lvl"], "hide_price": hide_price,
+                "leather_price": leather_price, "spell_cost": round(spell_per_hide),
+                "cost": round(cost), "profit": round(profit),
+                "product_id": t["leather"], "profit_hr": round(profit * 5000)})  # ~5000 hides/hr
+        results.sort(key=lambda x: x["profit"], reverse=True)
+        return jsonify({"items": results, "spell_per_hide": round(spell_per_hide)})
+    except Exception as e:
+        return jsonify({"error": str(e), "items": []})
+
+# ─────────────────────────────────────────────
+#  CANNONBALLS (Smithing)
+# ─────────────────────────────────────────────
+STEEL_BAR_ID = 2353
+CANNONBALL_ID = 2
+
+@app.route("/api/money/cballs")
+def api_money_cballs():
+    try:
+        prices = fetch_prices(); data_1h = fetch_1h()
+        try: data_5m = fetch_5m()
+        except: data_5m = {}
+        steel_price = round(_best_price(STEEL_BAR_ID, prices, data_1h, data_5m, "low"))
+        cball_price = round(_best_price(CANNONBALL_ID, prices, data_1h, data_5m, "high"))
+        if not steel_price or not cball_price:
+            return jsonify({"items": [], "error": "no_prices"})
+        # 1 steel bar = 4 cannonballs, ~144 bars/hr (super AFK)
+        profit_per_bar = (cball_price * 4) - steel_price
+        # Met double ammo mould (Giants Foundry): 1 bar = 8 cballs op 50% kans → avg 6
+        profit_double = (cball_price * 4.8) - steel_price  # avg met ~20% proc rate
+        return jsonify({"items": [{
+            "name": "Cannonballs", "lvl": 35,
+            "steel_price": steel_price, "cball_price": cball_price,
+            "profit_bar": profit_per_bar, "profit_hr": profit_per_bar * 144,
+            "balls_per_bar": 4, "bars_per_hr": 144,
+        }]})
+    except Exception as e:
+        return jsonify({"error": str(e), "items": []})
+
+# ─────────────────────────────────────────────
+#  BLAST FURNACE (Smithing)
+# ─────────────────────────────────────────────
+BF_DATA = [
+    {"ore": 444,  "bar": 2353, "name": "Steel bar",     "lvl": 30, "coal": 1, "bars_hr": 5400},
+    {"ore": 447,  "bar": 2359, "name": "Mithril bar",   "lvl": 50, "coal": 2, "bars_hr": 4800},
+    {"ore": 449,  "bar": 2361, "name": "Adamantite bar", "lvl": 70, "coal": 3, "bars_hr": 4200},
+    {"ore": 451,  "bar": 2363, "name": "Runite bar",    "lvl": 85, "coal": 4, "bars_hr": 3600},
+    {"ore": 442,  "bar": 2357, "name": "Gold bar",      "lvl": 40, "coal": 0, "bars_hr": 6500},
+]
+COAL_ID = 453
+
+@app.route("/api/money/blastfurnace")
+def api_money_blastfurnace():
+    try:
+        prices = fetch_prices(); data_1h = fetch_1h()
+        try: data_5m = fetch_5m()
+        except: data_5m = {}
+        coal_price = round(_best_price(COAL_ID, prices, data_1h, data_5m, "low"))
+        coffer_cost = 72000  # 72k/hr voor bf workers (bij 60+ smithing)
+        results = []
+        for b in BF_DATA:
+            ore_price = round(_best_price(b["ore"], prices, data_1h, data_5m, "low"))
+            bar_price = round(_best_price(b["bar"], prices, data_1h, data_5m, "high"))
+            if not ore_price or not bar_price: continue
+            # BF halveert coal requirement
+            coal_needed = b["coal"]  # al gehalveerd in data
+            cost = ore_price + (coal_price * coal_needed) + round(coffer_cost / b["bars_hr"])
+            profit = bar_price - cost
+            results.append({"name": b["name"], "lvl": b["lvl"], "ore_price": ore_price,
+                "bar_price": bar_price, "coal_needed": coal_needed, "coal_price": coal_price,
+                "cost": cost, "profit": profit, "product_id": b["bar"],
+                "bars_hr": b["bars_hr"], "profit_hr": profit * b["bars_hr"]})
+        results.sort(key=lambda x: x["profit_hr"], reverse=True)
+        return jsonify({"items": results, "coal_price": coal_price, "coffer_cost": coffer_cost})
+    except Exception as e:
+        return jsonify({"error": str(e), "items": []})
+
+# ─────────────────────────────────────────────
+#  COOKING
+# ─────────────────────────────────────────────
+COOK_DATA = [
+    {"raw": 3142, "cooked": 3144, "name": "Karambwan",    "lvl": 30, "rate": 4600},
+    {"raw": 383,  "cooked": 385,  "name": "Shark",         "lvl": 80, "rate": 1350},
+    {"raw": 395,  "cooked": 397,  "name": "Sea turtle",    "lvl": 82, "rate": 1350},
+    {"raw": 13439,"cooked": 13441,"name": "Anglerfish",    "lvl": 84, "rate": 1200},
+    {"raw": 389,  "cooked": 391,  "name": "Manta ray",     "lvl": 91, "rate": 1350},
+    {"raw": 11934,"cooked": 11936,"name": "Dark crab",     "lvl": 90, "rate": 1200},
+]
+
+@app.route("/api/money/cooking")
+def api_money_cooking():
+    try:
+        prices = fetch_prices(); data_1h = fetch_1h()
+        try: data_5m = fetch_5m()
+        except: data_5m = {}
+        results = []
+        for c in COOK_DATA:
+            raw_price = round(_best_price(c["raw"], prices, data_1h, data_5m, "low"))
+            cooked_price = round(_best_price(c["cooked"], prices, data_1h, data_5m, "high"))
+            if not raw_price or not cooked_price: continue
+            profit = cooked_price - raw_price
+            results.append({"name": c["name"], "lvl": c["lvl"], "raw_price": raw_price,
+                "cooked_price": cooked_price, "profit": profit,
+                "product_id": c["cooked"], "rate": c["rate"],
+                "profit_hr": profit * c["rate"]})
+        results.sort(key=lambda x: x["profit"], reverse=True)
+        return jsonify({"items": results})
+    except Exception as e:
+        return jsonify({"error": str(e), "items": []})
+
+# ─────────────────────────────────────────────
+#  FLETCHING (Stringing bows)
+# ─────────────────────────────────────────────
+BOW_STRING_ID = 1777
+FLETCH_DATA = [
+    {"unstrung": 50,   "strung": 841,  "name": "Maple longbow",    "lvl": 55},
+    {"unstrung": 56,   "strung": 847,  "name": "Yew longbow",      "lvl": 70},
+    {"unstrung": 62,   "strung": 853,  "name": "Magic longbow",    "lvl": 85},
+    {"unstrung": 48,   "strung": 839,  "name": "Maple shortbow",   "lvl": 50},
+    {"unstrung": 54,   "strung": 845,  "name": "Yew shortbow",     "lvl": 65},
+    {"unstrung": 60,   "strung": 851,  "name": "Magic shortbow",   "lvl": 80},
+]
+
+@app.route("/api/money/fletching")
+def api_money_fletching():
+    try:
+        prices = fetch_prices(); data_1h = fetch_1h()
+        try: data_5m = fetch_5m()
+        except: data_5m = {}
+        string_price = round(_best_price(BOW_STRING_ID, prices, data_1h, data_5m, "low"))
+        results = []
+        for f in FLETCH_DATA:
+            unstrung_price = round(_best_price(f["unstrung"], prices, data_1h, data_5m, "low"))
+            strung_price = round(_best_price(f["strung"], prices, data_1h, data_5m, "high"))
+            if not unstrung_price or not strung_price: continue
+            cost = unstrung_price + string_price
+            profit = strung_price - cost
+            results.append({"name": f["name"], "lvl": f["lvl"], "unstrung_price": unstrung_price,
+                "strung_price": strung_price, "string_price": string_price,
+                "cost": cost, "profit": profit, "product_id": f["strung"],
+                "profit_hr": profit * 2700})  # ~2700/hr
+        results.sort(key=lambda x: x["profit"], reverse=True)
+        return jsonify({"items": results, "string_price": string_price})
+    except Exception as e:
+        return jsonify({"error": str(e), "items": []})
+
 @app.route("/api/money/alch")
 def api_money_alch():
     staff = flask_request.args.get("staff", "fire")
@@ -1683,65 +2082,48 @@ tr:last-child td { border-bottom:none; }
         <div id="mm-magic-level" style="font-size:13px;color:#484f58"></div>
     </div>
 
-    <!-- HIGH ALCH SECTION -->
-    <div class="section">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:0 18px;cursor:pointer" onclick="toggleMmSection('alch')">
-            <div class="sh t2" style="margin:0;padding:10px 0">🔥 High Alchemy <span id="alch-toggle" style="font-size:12px;color:#484f58">▼</span></div>
-            <div style="display:flex;gap:8px;align-items:center" onclick="event.stopPropagation()">
-                <label style="font-size:11px;color:#8b949e">Staf:</label>
-                <select id="alch-staff" onchange="loadAlch()" style="padding:4px 10px;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:12px;cursor:pointer">
-                    <option value="fire" selected>Staff of fire (aanbevolen)</option>
-                    <option value="none">Geen staf</option>
-                    <option value="bryophyta">Bryophyta's staff</option>
-                </select>
-            </div>
-        </div>
-        <div id="alch-body">
-            <div id="alch-info" style="padding:4px 18px;font-size:12px;color:#8b949e"></div>
-            <div style="padding:0 18px 6px"><b style="font-size:13px;color:#3fb950">📦 Bulk Items</b> <span style="font-size:11px;color:#484f58">(buy limit 1000+ — runes, bolts, supplies)</span></div>
-            <div id="alch-bulk" style="padding:0 18px 12px"></div>
-            <div style="padding:0 18px 6px"><b style="font-size:13px;color:#58a6ff">💎 High Value Items</b> <span style="font-size:11px;color:#484f58">(20K+ koopprijs)</span></div>
-            <div id="alch-highvalue" style="padding:0 18px 18px"></div>
-        </div>
-    </div>
+    <!-- ═══ MAGIC ═══ -->
+    <div style="margin-top:8px;margin-bottom:4px;font-size:11px;font-weight:700;color:#a371f7;text-transform:uppercase;letter-spacing:1.5px;padding-left:4px">🧙 Magic</div>
 
-    <!-- BOLT ENCHANT SECTION -->
-    <div class="section">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:0 18px;cursor:pointer" onclick="toggleMmSection('bolt')">
-            <div class="sh t3" style="margin:0;padding:10px 0">🏹 Bolt Enchanting <span id="bolt-toggle" style="font-size:12px;color:#484f58">▼</span></div>
-            <div style="display:flex;gap:8px;align-items:center" onclick="event.stopPropagation()">
-                <label style="font-size:11px;color:#8b949e">Staf:</label>
-                <select id="bolt-staff" onchange="loadBolts()" style="padding:4px 10px;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:12px;cursor:pointer">
-                    <option value="none">Geen staf</option>
-                    <option value="fire">Staff of fire</option>
-                    <option value="water">Staff of water</option>
-                    <option value="earth">Staff of earth</option>
-                    <option value="air">Staff of air</option>
-                    <option value="smoke">Smoke battlestaff</option>
-                    <option value="steam">Steam battlestaff</option>
-                    <option value="dust">Dust battlestaff</option>
-                    <option value="mud">Mud battlestaff</option>
-                    <option value="lava">Lava battlestaff</option>
-                    <option value="mist">Mist battlestaff</option>
-                </select>
-            </div>
-        </div>
-        <div id="bolt-body">
-            <div id="bolt-info" style="padding:4px 18px;font-size:12px;color:#8b949e"></div>
-            <div id="bolt-table" style="padding:0 18px 18px"></div>
-        </div>
-    </div>
+    <div class="section"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:0 18px;cursor:pointer" onclick="toggleMmSection('alch')"><div class="sh t2" style="margin:0;padding:10px 0">🔥 High Alchemy <span id="alch-toggle" style="font-size:12px;color:#484f58">▼</span></div><div style="display:flex;gap:8px;align-items:center" onclick="event.stopPropagation()"><label style="font-size:11px;color:#8b949e">Staf:</label><select id="alch-staff" onchange="loadAlch()" style="padding:4px 10px;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:12px;cursor:pointer"><option value="fire" selected>Staff of fire</option><option value="none">Geen staf</option><option value="bryophyta">Bryophyta's staff</option></select></div></div><div id="alch-body"><div id="alch-info" style="padding:4px 18px;font-size:12px;color:#8b949e"></div><div style="padding:0 18px 6px"><b style="font-size:13px;color:#3fb950">📦 Bulk</b> <span style="font-size:11px;color:#484f58">(limit 1000+)</span></div><div id="alch-bulk" style="padding:0 18px 12px"></div><div style="padding:0 18px 6px"><b style="font-size:13px;color:#58a6ff">💎 High Value</b> <span style="font-size:11px;color:#484f58">(20K+)</span></div><div id="alch-highvalue" style="padding:0 18px 18px"></div></div></div>
 
-    <!-- BATTLESTAFF CRAFTING SECTION -->
-    <div class="section">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:0 18px;cursor:pointer" onclick="toggleMmSection('staves')">
-            <div class="sh t1" style="margin:0;padding:10px 0">🪄 Battlestaff Crafting <span id="staves-toggle" style="font-size:12px;color:#484f58">▼</span></div>
-        </div>
-        <div id="staves-body">
-            <div id="staves-info" style="padding:4px 18px;font-size:12px;color:#8b949e"></div>
-            <div id="staves-table" style="padding:0 18px 18px"></div>
-        </div>
-    </div>
+    <div class="section"><div style="padding:0 18px;cursor:pointer" onclick="toggleMmSection('bolt')"><div class="sh t3" style="margin:0;padding:10px 0">🏹 Bolt Enchanting <span id="bolt-toggle" style="font-size:12px;color:#484f58">▼</span></div></div><div id="bolt-body"><div style="padding:0 18px"><div style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><label style="font-size:11px;color:#8b949e">Staf:</label><select id="bolt-staff" onchange="loadBolts()" style="padding:4px 10px;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:12px;cursor:pointer"><option value="none">Geen staf</option><option value="fire">Staff of fire</option><option value="water">Staff of water</option><option value="earth">Staff of earth</option><option value="air">Staff of air</option><option value="smoke">Smoke battlestaff</option><option value="steam">Steam battlestaff</option><option value="dust">Dust battlestaff</option><option value="mud">Mud battlestaff</option><option value="lava">Lava battlestaff</option><option value="mist">Mist battlestaff</option></select></div></div><div id="bolt-info" style="padding:4px 18px;font-size:12px;color:#8b949e"></div><div id="bolt-table" style="padding:0 18px 18px"></div></div></div>
+
+    <div class="section"><div style="padding:0 18px;cursor:pointer" onclick="toggleMmSection('planks')"><div class="sh t2" style="margin:0;padding:10px 0">🪵 Plank Make (Lunar) <span id="planks-toggle" style="font-size:12px;color:#484f58">▼</span></div></div><div id="planks-body"><div id="planks-info" style="padding:4px 18px;font-size:12px;color:#8b949e"></div><div id="planks-table" style="padding:0 18px 18px"></div></div></div>
+
+    <div class="section"><div style="padding:0 18px;cursor:pointer" onclick="toggleMmSection('tan')"><div class="sh t3" style="margin:0;padding:10px 0">🐄 Tan Leather (Lunar) <span id="tan-toggle" style="font-size:12px;color:#484f58">▼</span></div></div><div id="tan-body"><div id="tan-info" style="padding:4px 18px;font-size:12px;color:#8b949e"></div><div id="tan-table" style="padding:0 18px 18px"></div></div></div>
+
+    <!-- ═══ CRAFTING ═══ -->
+    <div style="margin-top:16px;margin-bottom:4px;font-size:11px;font-weight:700;color:#d29922;text-transform:uppercase;letter-spacing:1.5px;padding-left:4px">✂️ Crafting</div>
+
+    <div class="section"><div style="padding:0 18px;cursor:pointer" onclick="toggleMmSection('staves')"><div class="sh t1" style="margin:0;padding:10px 0">🪄 Battlestaff Crafting <span id="staves-toggle" style="font-size:12px;color:#484f58">▼</span></div></div><div id="staves-body"><div id="staves-info" style="padding:4px 18px;font-size:12px;color:#8b949e"></div><div id="staves-table" style="padding:0 18px 18px"></div></div></div>
+
+    <div class="section"><div style="padding:0 18px;cursor:pointer" onclick="toggleMmSection('dhide')"><div class="sh t2" style="margin:0;padding:10px 0">🐉 Dragonhide Bodies <span id="dhide-toggle" style="font-size:12px;color:#484f58">▼</span></div></div><div id="dhide-body"><div id="dhide-table" style="padding:0 18px 18px"></div></div></div>
+
+    <div class="section"><div style="padding:0 18px;cursor:pointer" onclick="toggleMmSection('gems')"><div class="sh t3" style="margin:0;padding:10px 0">💎 Gem Cutting <span id="gems-toggle" style="font-size:12px;color:#484f58">▼</span></div></div><div id="gems-body"><div id="gems-table" style="padding:0 18px 18px"></div></div></div>
+
+    <div class="section"><div style="padding:0 18px;cursor:pointer" onclick="toggleMmSection('jewelry')"><div class="sh t1" style="margin:0;padding:10px 0">💍 Gold Jewelry <span id="jewelry-toggle" style="font-size:12px;color:#484f58">▼</span></div></div><div id="jewelry-body"><div id="jewelry-table" style="padding:0 18px 18px"></div></div></div>
+
+    <div class="section"><div style="padding:0 18px;cursor:pointer" onclick="toggleMmSection('glass')"><div class="sh t2" style="margin:0;padding:10px 0">🫧 Glass Blowing <span id="glass-toggle" style="font-size:12px;color:#484f58">▼</span></div></div><div id="glass-body"><div id="glass-table" style="padding:0 18px 18px"></div></div></div>
+
+    <div class="section"><div style="padding:0 18px;cursor:pointer" onclick="toggleMmSection('stringing')"><div class="sh t3" style="margin:0;padding:10px 0">📿 Stringing Amulets <span id="stringing-toggle" style="font-size:12px;color:#484f58">▼</span></div></div><div id="stringing-body"><div id="stringing-table" style="padding:0 18px 18px"></div></div></div>
+
+    <!-- ═══ SMITHING ═══ -->
+    <div style="margin-top:16px;margin-bottom:4px;font-size:11px;font-weight:700;color:#58a6ff;text-transform:uppercase;letter-spacing:1.5px;padding-left:4px">🔨 Smithing</div>
+
+    <div class="section"><div style="padding:0 18px;cursor:pointer" onclick="toggleMmSection('cballs')"><div class="sh t1" style="margin:0;padding:10px 0">💣 Cannonballs <span id="cballs-toggle" style="font-size:12px;color:#484f58">▼</span></div></div><div id="cballs-body"><div id="cballs-table" style="padding:0 18px 18px"></div></div></div>
+
+    <div class="section"><div style="padding:0 18px;cursor:pointer" onclick="toggleMmSection('bf')"><div class="sh t2" style="margin:0;padding:10px 0">🏭 Blast Furnace <span id="bf-toggle" style="font-size:12px;color:#484f58">▼</span></div></div><div id="bf-body"><div id="bf-table" style="padding:0 18px 18px"></div></div></div>
+
+    <!-- ═══ COOKING ═══ -->
+    <div style="margin-top:16px;margin-bottom:4px;font-size:11px;font-weight:700;color:#3fb950;text-transform:uppercase;letter-spacing:1.5px;padding-left:4px">🍳 Cooking</div>
+
+    <div class="section"><div style="padding:0 18px;cursor:pointer" onclick="toggleMmSection('cook')"><div class="sh t1" style="margin:0;padding:10px 0">🦈 Cooking Profit <span id="cook-toggle" style="font-size:12px;color:#484f58">▼</span></div></div><div id="cook-body"><div id="cook-table" style="padding:0 18px 18px"></div></div></div>
+
+    <!-- ═══ FLETCHING ═══ -->
+    <div style="margin-top:16px;margin-bottom:4px;font-size:11px;font-weight:700;color:#da3633;text-transform:uppercase;letter-spacing:1.5px;padding-left:4px">🏹 Fletching</div>
+
+    <div class="section"><div style="padding:0 18px;cursor:pointer" onclick="toggleMmSection('fletch')"><div class="sh t1" style="margin:0;padding:10px 0">🏹 Stringing Bows <span id="fletch-toggle" style="font-size:12px;color:#484f58">▼</span></div></div><div id="fletch-body"><div id="fletch-table" style="padding:0 18px 18px"></div></div></div>
 </div>
 
 <!-- INSTELLINGEN -->
@@ -2722,9 +3104,11 @@ async function loadMoneyMethods() {
     } catch(e) {
         document.getElementById('mm-magic-level').innerHTML = '';
     }
-    loadAlch();
-    loadBolts();
-    loadStaves();
+    loadAlch(); loadBolts(); loadStaves();
+    loadDhide(); loadGems(); loadJewelry(); loadGlass(); loadStringing();
+    loadPlanks(); loadTan();
+    loadCballs(); loadBf();
+    loadCooking(); loadFletching();
 }
 
 async function loadStaves() {
@@ -2759,6 +3143,187 @@ async function loadStaves() {
     } catch(e) {
         tableEl.innerHTML = '<span style="color:#da3633">Fout bij laden</span>';
     }
+}
+
+// Generic table builder for simple crafting methods
+function buildSimpleTable(items, cols) {
+    if (!items || !items.length) return '<span style="color:#484f58">Geen data</span>';
+    let h = '<table><tr>';
+    cols.forEach(c => h += `<th>${c.label}</th>`);
+    h += '</tr>';
+    items.forEach(it => {
+        h += '<tr>';
+        cols.forEach(c => {
+            let v = c.fn(it);
+            let style = c.style ? c.style(it) : '';
+            h += `<td style="${style}">${v}</td>`;
+        });
+        h += '</tr>';
+    });
+    return h + '</table>';
+}
+function profitStyle(it, key) { return (it[key||'profit'] > 0 ? 'color:#3fb950;font-weight:600' : 'color:#da3633;font-weight:600'); }
+function nameLink(it, key) { return `<span style="cursor:pointer;color:#58a6ff" onclick="openItemDetail(${it.product_id},'${(it.name||'').replace(/'/g,"\\'")}')">${it.name}</span>`; }
+
+async function loadSimpleSection(url, tableId, columns) {
+    let el = document.getElementById(tableId);
+    el.innerHTML = '<span style="color:#484f58">Laden...</span>';
+    try {
+        let d = await (await fetch(url)).json();
+        if (d.error) { el.innerHTML = `<span style="color:#da3633">${d.error}</span>`; return d; }
+        el.innerHTML = buildSimpleTable(d.items, columns);
+        return d;
+    } catch(e) { el.innerHTML = '<span style="color:#da3633">Fout bij laden</span>'; return null; }
+}
+
+async function loadDhide() {
+    await loadSimpleSection('/api/money/dhide', 'dhide-table', [
+        {label:'Lvl', fn:i=>`<span style="color:#484f58">${i.lvl}</span>`},
+        {label:'Body', fn:nameLink},
+        {label:'Hide prijs', fn:i=>gp(i.hide_price)},
+        {label:`Kosten (3x)`, fn:i=>gp(i.cost)},
+        {label:'Verkoop', fn:i=>gp(i.body_price)},
+        {label:'Winst/body', fn:i=>gp(i.profit), style:i=>profitStyle(i)},
+        {label:'Winst/uur', fn:i=>gp(i.profit_hr), style:i=>profitStyle(i,'profit_hr')},
+    ]);
+}
+
+async function loadGems() {
+    await loadSimpleSection('/api/money/gems', 'gems-table', [
+        {label:'Lvl', fn:i=>`<span style="color:#484f58">${i.lvl}</span>`},
+        {label:'Gem', fn:nameLink},
+        {label:'Uncut', fn:i=>gp(i.uncut_price)},
+        {label:'Cut', fn:i=>gp(i.cut_price)},
+        {label:'Winst', fn:i=>gp(i.profit), style:i=>profitStyle(i)},
+        {label:'Winst/uur', fn:i=>gp(i.profit_hr), style:i=>profitStyle(i,'profit_hr')},
+    ]);
+}
+
+async function loadJewelry() {
+    await loadSimpleSection('/api/money/jewelry', 'jewelry-table', [
+        {label:'Lvl', fn:i=>`<span style="color:#484f58">${i.lvl}</span>`},
+        {label:'Item', fn:nameLink},
+        {label:'Gem', fn:i=>`<span style="color:#8b949e">${i.gem}</span>`},
+        {label:'Kosten', fn:i=>gp(i.cost)},
+        {label:'Verkoop', fn:i=>gp(i.sell_price)},
+        {label:'Winst', fn:i=>gp(i.profit), style:i=>profitStyle(i)},
+        {label:'Winst/uur', fn:i=>gp(i.profit_hr), style:i=>profitStyle(i,'profit_hr')},
+    ]);
+}
+
+async function loadGlass() {
+    await loadSimpleSection('/api/money/glass', 'glass-table', [
+        {label:'Lvl', fn:i=>`<span style="color:#484f58">${i.lvl}</span>`},
+        {label:'Item', fn:nameLink},
+        {label:'Glas', fn:i=>gp(i.glass_price)},
+        {label:'Verkoop', fn:i=>gp(i.sell_price)},
+        {label:'Winst', fn:i=>gp(i.profit), style:i=>profitStyle(i)},
+        {label:'Winst/uur', fn:i=>gp(i.profit_hr), style:i=>profitStyle(i,'profit_hr')},
+    ]);
+}
+
+async function loadStringing() {
+    await loadSimpleSection('/api/money/stringing', 'stringing-table', [
+        {label:'Lvl', fn:i=>`<span style="color:#484f58">${i.lvl}</span>`},
+        {label:'Amulet', fn:nameLink},
+        {label:'Unstrung', fn:i=>gp(i.unstrung_price)},
+        {label:'Wool', fn:i=>gp(i.wool_price)},
+        {label:'Strung', fn:i=>gp(i.strung_price)},
+        {label:'Winst', fn:i=>gp(i.profit), style:i=>profitStyle(i)},
+        {label:'Winst/uur', fn:i=>gp(i.profit_hr), style:i=>profitStyle(i,'profit_hr')},
+    ]);
+}
+
+async function loadPlanks() {
+    let el = document.getElementById('planks-table');
+    el.innerHTML = '<span style="color:#484f58">Laden...</span>';
+    try {
+        let d = await (await fetch('/api/money/planks')).json();
+        if (d.error) { el.innerHTML = `<span style="color:#da3633">${d.error}</span>`; return; }
+        document.getElementById('planks-info').innerHTML = `Spell cost: <b>${gp(d.spell_cost)}</b> GP (2 astral + 1 nature + 15 earth) | ~1860 casts/hr`;
+        el.innerHTML = buildSimpleTable(d.items, [
+            {label:'Lvl', fn:i=>`<span style="color:#484f58">${i.lvl}</span>`},
+            {label:'Plank', fn:nameLink},
+            {label:'Log', fn:i=>gp(i.log_price)},
+            {label:'Spell', fn:i=>gp(i.spell_cost)},
+            {label:'Plank prijs', fn:i=>gp(i.plank_price)},
+            {label:'Winst', fn:i=>gp(i.profit), style:i=>profitStyle(i)},
+            {label:'Winst/uur', fn:i=>gp(i.profit_hr), style:i=>profitStyle(i,'profit_hr')},
+        ]);
+    } catch(e) { el.innerHTML = '<span style="color:#da3633">Fout bij laden</span>'; }
+}
+
+async function loadTan() {
+    let el = document.getElementById('tan-table');
+    el.innerHTML = '<span style="color:#484f58">Laden...</span>';
+    try {
+        let d = await (await fetch('/api/money/tan')).json();
+        if (d.error) { el.innerHTML = `<span style="color:#da3633">${d.error}</span>`; return; }
+        document.getElementById('tan-info').innerHTML = `Spell cost: <b>${gp(d.spell_per_hide)}</b> GP/hide (2 astral + 1 nature per 5 hides) | ~5000 hides/hr`;
+        el.innerHTML = buildSimpleTable(d.items, [
+            {label:'Lvl', fn:i=>`<span style="color:#484f58">${i.lvl}</span>`},
+            {label:'Leather', fn:nameLink},
+            {label:'Hide', fn:i=>gp(i.hide_price)},
+            {label:'Spell', fn:i=>gp(i.spell_cost)},
+            {label:'Verkoop', fn:i=>gp(i.leather_price)},
+            {label:'Winst', fn:i=>gp(i.profit), style:i=>profitStyle(i)},
+            {label:'Winst/uur', fn:i=>gp(i.profit_hr), style:i=>profitStyle(i,'profit_hr')},
+        ]);
+    } catch(e) { el.innerHTML = '<span style="color:#da3633">Fout bij laden</span>'; }
+}
+
+async function loadCballs() {
+    let el = document.getElementById('cballs-table');
+    el.innerHTML = '<span style="color:#484f58">Laden...</span>';
+    try {
+        let d = await (await fetch('/api/money/cballs')).json();
+        if (d.error || !d.items.length) { el.innerHTML = '<span style="color:#484f58">Geen data</span>'; return; }
+        let c = d.items[0];
+        let cls = c.profit_bar > 0 ? 'color:#3fb950' : 'color:#da3633';
+        el.innerHTML = `<div style="padding:8px 0;font-size:14px;color:#c9d1d9;line-height:2">
+            <div>Steel bar: <b>${gp(c.steel_price)}</b> GP → 4 cannonballs: <b>${gp(c.cball_price * 4)}</b> GP</div>
+            <div>Winst per bar: <b style="${cls}">${gp(c.profit_bar)}</b> GP</div>
+            <div>~${c.bars_per_hr} bars/uur (super AFK) → <b style="${cls}">${gp(c.profit_hr)}</b> GP/uur</div>
+            <div style="font-size:12px;color:#8b949e;margin-top:4px">💡 Vereist: Dwarf Cannon quest + 35 Smithing. Zeer AFK — ideaal als bijverdienste.</div>
+        </div>`;
+    } catch(e) { el.innerHTML = '<span style="color:#da3633">Fout bij laden</span>'; }
+}
+
+async function loadBf() {
+    await loadSimpleSection('/api/money/blastfurnace', 'bf-table', [
+        {label:'Lvl', fn:i=>`<span style="color:#484f58">${i.lvl}</span>`},
+        {label:'Bar', fn:nameLink},
+        {label:'Ore', fn:i=>gp(i.ore_price)},
+        {label:'Coal', fn:i=>`${i.coal_needed}x ${gp(i.coal_price)}`},
+        {label:'Bar prijs', fn:i=>gp(i.bar_price)},
+        {label:'Winst/bar', fn:i=>gp(i.profit), style:i=>profitStyle(i)},
+        {label:'Bars/hr', fn:i=>i.bars_hr.toLocaleString()},
+        {label:'Winst/uur', fn:i=>gp(i.profit_hr), style:i=>profitStyle(i,'profit_hr')},
+    ]);
+}
+
+async function loadCooking() {
+    await loadSimpleSection('/api/money/cooking', 'cook-table', [
+        {label:'Lvl', fn:i=>`<span style="color:#484f58">${i.lvl}</span>`},
+        {label:'Vis', fn:nameLink},
+        {label:'Raw', fn:i=>gp(i.raw_price)},
+        {label:'Cooked', fn:i=>gp(i.cooked_price)},
+        {label:'Winst', fn:i=>gp(i.profit), style:i=>profitStyle(i)},
+        {label:'Rate/hr', fn:i=>i.rate.toLocaleString()},
+        {label:'Winst/uur', fn:i=>gp(i.profit_hr), style:i=>profitStyle(i,'profit_hr')},
+    ]);
+}
+
+async function loadFletching() {
+    await loadSimpleSection('/api/money/fletching', 'fletch-table', [
+        {label:'Lvl', fn:i=>`<span style="color:#484f58">${i.lvl}</span>`},
+        {label:'Bow', fn:nameLink},
+        {label:'Unstrung', fn:i=>gp(i.unstrung_price)},
+        {label:'String', fn:i=>gp(i.string_price)},
+        {label:'Strung', fn:i=>gp(i.strung_price)},
+        {label:'Winst', fn:i=>gp(i.profit), style:i=>profitStyle(i)},
+        {label:'Winst/uur', fn:i=>gp(i.profit_hr), style:i=>profitStyle(i,'profit_hr')},
+    ]);
 }
 
 async function loadAlch() {
