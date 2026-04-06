@@ -36,7 +36,7 @@ API_BASE = "https://prices.runescape.wiki/api/v1/osrs"
 # ─────────────────────────────────────────────
 #  AUTO-UPDATE
 # ─────────────────────────────────────────────
-APP_VERSION = "6.3"
+APP_VERSION = "6.4"
 # ⬇️ PAS DIT AAN naar je eigen GitHub repo raw URL
 UPDATE_CHECK_URL = "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/version.json"
 # Het version.json bestand op GitHub moet er zo uitzien:
@@ -1741,6 +1741,270 @@ def api_money_bowcut():
     except Exception as e:
         return jsonify({"error": str(e), "items": []})
 
+# ─────────────────────────────────────────────
+#  HERBLORE (Potion making)
+# ─────────────────────────────────────────────
+VIAL_OF_WATER_ID = 227
+HERBLORE_DATA = [
+    # herb_id = grimy/clean herb, secondary_id, product_id, name, lvl, xp
+    {"herb": 249,  "secondary": 225,   "product": 2434, "name": "Prayer potion",      "lvl": 38, "xp": 87.5,  "herb_name": "Ranarr weed",    "sec_name": "Snape grass"},
+    {"herb": 3000, "secondary": 235,   "product": 3026, "name": "Super restore",      "lvl": 63, "xp": 142.5, "herb_name": "Snapdragon",     "sec_name": "Red spiders' eggs"},
+    {"herb": 2998, "secondary": 6693,  "product": 6685, "name": "Saradomin brew",     "lvl": 81, "xp": 180,   "herb_name": "Toadflax",       "sec_name": "Crushed nest"},
+    {"herb": 267,  "secondary": 245,   "product": 2444, "name": "Ranging potion",     "lvl": 72, "xp": 162.5, "herb_name": "Dwarf weed",     "sec_name": "Wine of zamorak"},
+    {"herb": 2481, "secondary": 6049,  "product": 2452, "name": "Anti-fire potion",   "lvl": 69, "xp": 157.5, "herb_name": "Lantadyme",      "sec_name": "Dragon scale dust"},
+    {"herb": 259,  "secondary": 9736,  "product": 9739, "name": "Super antifire",     "lvl": 85, "xp": 210,   "herb_name": "Lantadyme",      "sec_name": "Crushed superior dragon bones"},
+    {"herb": 263,  "secondary": 245,   "product": 2436, "name": "Super attack",       "lvl": 45, "xp": 100,   "herb_name": "Irit leaf",      "sec_name": "Eye of newt"},
+    {"herb": 265,  "secondary": 221,   "product": 2440, "name": "Super strength",     "lvl": 55, "xp": 125,   "herb_name": "Kwuarm",         "sec_name": "Limpwurt root"},
+    {"herb": 2481, "secondary": 239,   "product": 2442, "name": "Super defence",      "lvl": 66, "xp": 150,   "herb_name": "Cadantine",      "sec_name": "White berries"},
+    {"herb": 269,  "secondary": 2970,  "product": 3040, "name": "Magic potion",       "lvl": 76, "xp": 172.5, "herb_name": "Potato cactus",  "sec_name": "Lantadyme"},
+    {"herb": 2998, "secondary": 1975,  "product": 2428, "name": "Stamina potion",     "lvl": 77, "xp": 102,   "herb_name": "Toadflax",       "sec_name": "Amylase crystal (4x)"},
+]
+
+@app.route("/api/money/herblore")
+def api_money_herblore():
+    try:
+        prices = fetch_prices(); data_1h = fetch_1h()
+        try: data_5m = fetch_5m()
+        except: data_5m = {}
+        vial_price = round(_best_price(VIAL_OF_WATER_ID, prices, data_1h, data_5m, "low"))
+        results = []
+        for p in HERBLORE_DATA:
+            herb_price = round(_best_price(p["herb"], prices, data_1h, data_5m, "low"))
+            sec_price = round(_best_price(p["secondary"], prices, data_1h, data_5m, "low"))
+            potion_price = round(_best_price(p["product"], prices, data_1h, data_5m, "high"))
+            if not herb_price or not potion_price: continue
+            sec_qty = 4 if "4x" in p.get("sec_name", "") else 1
+            cost = herb_price + (sec_price * sec_qty) + vial_price
+            profit = potion_price - cost
+            rate = 2400  # ~2400 potions/hr (bank standing)
+            results.append({"name": p["name"], "lvl": p["lvl"],
+                "herb_name": p["herb_name"], "herb_price": herb_price,
+                "sec_name": p["sec_name"], "sec_price": sec_price * sec_qty,
+                "vial_price": vial_price, "cost": cost,
+                "sell_price": potion_price, "profit": profit,
+                "product_id": p["product"],
+                "xp": p["xp"], "xp_hr": round(p["xp"] * rate),
+                "profit_hr": profit * rate, "afk_time": "50 sec per inv"})
+        results.sort(key=lambda x: x["profit"], reverse=True)
+        return jsonify({"items": results, "vial_price": vial_price})
+    except Exception as e:
+        return jsonify({"error": str(e), "items": []})
+
+# ─────────────────────────────────────────────
+#  RUNECRAFTING
+# ─────────────────────────────────────────────
+PURE_ESSENCE_ID = 7936
+RC_DATA = [
+    # rune_id, name, lvl, multi_lvl (level voor 2x runes), xp, rate/hr, afk
+    {"rune": 556, "name": "Air rune",     "lvl": 1,  "multi_lvl": 11, "xp": 5,    "rate": 2400, "afk": "Active (running)"},
+    {"rune": 558, "name": "Fire rune",    "lvl": 14, "multi_lvl": 35, "xp": 7,    "rate": 2400, "afk": "Active (running)"},
+    {"rune": 564, "name": "Cosmic rune",  "lvl": 27, "multi_lvl": 59, "xp": 8,    "rate": 2000, "afk": "Active"},
+    {"rune": 561, "name": "Nature rune",  "lvl": 44, "multi_lvl": 91, "xp": 9,    "rate": 1800, "afk": "Active (Abyss)"},
+    {"rune": 563, "name": "Law rune",     "lvl": 54, "multi_lvl": 99, "xp": 9.5,  "rate": 1500, "afk": "Active (Trawler)"},
+    {"rune": 565, "name": "Death rune",   "lvl": 65, "multi_lvl": 99, "xp": 10,   "rate": 1400, "afk": "Active (Abyss)"},
+    {"rune": 566, "name": "Blood rune",   "lvl": 77, "multi_lvl": 99, "xp": 23.8, "rate": 1500, "afk": "2 min per inv"},
+    {"rune": 21880, "name": "Wrath rune", "lvl": 95, "multi_lvl": 99, "xp": 8,    "rate": 1200, "afk": "Active"},
+]
+
+@app.route("/api/money/runecraft")
+def api_money_runecraft():
+    try:
+        prices = fetch_prices(); data_1h = fetch_1h()
+        try: data_5m = fetch_5m()
+        except: data_5m = {}
+        ess_price = round(_best_price(PURE_ESSENCE_ID, prices, data_1h, data_5m, "low"))
+        rc_lvl = int(flask_request.args.get("level", "99"))
+        results = []
+        for r in RC_DATA:
+            rune_price = round(_best_price(r["rune"], prices, data_1h, data_5m, "high"))
+            if not rune_price: continue
+            # Multipels: op double level krijg je 2x, op triple 3x, etc.
+            multiplier = 1
+            if rc_lvl >= r["multi_lvl"]:
+                multiplier = max(1, rc_lvl // r["multi_lvl"])
+                if multiplier > 4: multiplier = 4  # cap op 4x
+            profit = (rune_price * multiplier) - ess_price
+            rate = r["rate"]
+            results.append({"name": r["name"], "lvl": r["lvl"],
+                "rune_price": rune_price, "ess_price": ess_price,
+                "multiplier": multiplier, "multi_lvl": r["multi_lvl"],
+                "profit": profit, "product_id": r["rune"],
+                "xp": r["xp"], "xp_hr": round(r["xp"] * rate),
+                "profit_hr": profit * rate, "afk_time": r["afk"]})
+        results.sort(key=lambda x: x["profit_hr"], reverse=True)
+        return jsonify({"items": results, "ess_price": ess_price, "rc_level": rc_lvl})
+    except Exception as e:
+        return jsonify({"error": str(e), "items": []})
+
+# ─────────────────────────────────────────────
+#  HUNTER (Chinchompas)
+# ─────────────────────────────────────────────
+HUNTER_DATA = [
+    {"product": 9976,  "name": "Grey chinchompa",  "lvl": 53, "rate": 350, "xp": 198.4, "afk": "Click-intensive"},
+    {"product": 10033, "name": "Red chinchompa",    "lvl": 63, "rate": 500, "xp": 265,   "afk": "Click-intensive"},
+    {"product": 10034, "name": "Black chinchompa",  "lvl": 73, "rate": 600, "xp": 315,   "afk": "Click-intensive (Wilderness)"},
+]
+
+@app.route("/api/money/hunter")
+def api_money_hunter():
+    try:
+        prices = fetch_prices(); data_1h = fetch_1h()
+        try: data_5m = fetch_5m()
+        except: data_5m = {}
+        results = []
+        for h in HUNTER_DATA:
+            sell_price = round(_best_price(h["product"], prices, data_1h, data_5m, "high"))
+            if not sell_price: continue
+            profit_hr = sell_price * h["rate"]
+            results.append({"name": h["name"], "lvl": h["lvl"],
+                "sell_price": sell_price, "product_id": h["product"],
+                "rate": h["rate"], "profit": sell_price,
+                "xp": h["xp"], "xp_hr": round(h["xp"] * h["rate"]),
+                "profit_hr": profit_hr, "afk_time": h["afk"]})
+        results.sort(key=lambda x: x["profit_hr"], reverse=True)
+        return jsonify({"items": results})
+    except Exception as e:
+        return jsonify({"error": str(e), "items": []})
+
+# ─────────────────────────────────────────────
+#  BIRDHOUSE RUNS
+# ─────────────────────────────────────────────
+BIRDHOUSE_DATA = [
+    {"log": 1521, "name": "Oak birdhouse",      "lvl": 15, "craft_lvl": 15, "seed_slots": 10, "nest_avg": 0.8},
+    {"log": 1519, "name": "Teak birdhouse",     "lvl": 25, "craft_lvl": 25, "seed_slots": 10, "nest_avg": 0.9},
+    {"log": 1517, "name": "Maple birdhouse",    "lvl": 35, "craft_lvl": 35, "seed_slots": 10, "nest_avg": 1.0},
+    {"log": 6332, "name": "Mahogany birdhouse", "lvl": 45, "craft_lvl": 45, "seed_slots": 10, "nest_avg": 1.1},
+    {"log": 1515, "name": "Yew birdhouse",      "lvl": 60, "craft_lvl": 50, "seed_slots": 10, "nest_avg": 1.2},
+    {"log": 1513, "name": "Magic birdhouse",    "lvl": 75, "craft_lvl": 55, "seed_slots": 10, "nest_avg": 1.3},
+    {"log": 19669, "name": "Redwood birdhouse", "lvl": 90, "craft_lvl": 60, "seed_slots": 10, "nest_avg": 1.5},
+]
+CLOCKWORK_ID = 8792
+CHISEL_ID = 1755
+HOP_SEEDS = [5305, 5307, 5309, 5311, 5313]  # cheap hop seeds to fill birdhouses
+# Nests drop: bird nest (5070-5074) → seeds, rings, or empty. Avg value varies.
+BIRD_NEST_AVG_VALUE = 5000  # gemiddelde waarde van een bird nest (seeds + ring drops)
+
+@app.route("/api/money/birdhouse")
+def api_money_birdhouse():
+    try:
+        prices = fetch_prices(); data_1h = fetch_1h()
+        try: data_5m = fetch_5m()
+        except: data_5m = {}
+        # Cheapest hop seed
+        seed_prices = []
+        for sid in HOP_SEEDS:
+            p = round(_best_price(sid, prices, data_1h, data_5m, "low"))
+            if p: seed_prices.append(p)
+        seed_price = min(seed_prices) if seed_prices else 5
+        results = []
+        for b in BIRDHOUSE_DATA:
+            log_price = round(_best_price(b["log"], prices, data_1h, data_5m, "low"))
+            if not log_price: continue
+            # 4 birdhouses per run, each needs: 1 log + 1 clockwork (reusable) + 10 seeds
+            cost_per_house = log_price + (seed_price * b["seed_slots"])
+            cost_per_run = cost_per_house * 4
+            nests_per_run = round(b["nest_avg"] * 4, 1)
+            revenue_per_run = round(BIRD_NEST_AVG_VALUE * nests_per_run)
+            profit_per_run = revenue_per_run - cost_per_run
+            # Run every 50 min, ~28 runs/day max but realistically 8-12
+            runs_per_day = 12
+            results.append({"name": b["name"], "lvl": b["lvl"], "craft_lvl": b["craft_lvl"],
+                "log_price": log_price, "seed_price": seed_price * b["seed_slots"],
+                "cost_run": cost_per_run, "nests_run": nests_per_run,
+                "revenue_run": revenue_per_run, "profit_run": profit_per_run,
+                "profit_day": profit_per_run * runs_per_day,
+                "xp_run": round(b["nest_avg"] * 4 * 500),  # ~500 hunter xp per nest
+                "afk_time": "2 min per run (elke 50 min)"})
+        results.sort(key=lambda x: x["profit_run"], reverse=True)
+        return jsonify({"items": results, "seed_price": seed_price, "nest_value": BIRD_NEST_AVG_VALUE})
+    except Exception as e:
+        return jsonify({"error": str(e), "items": []})
+
+# ─────────────────────────────────────────────
+#  PRICE ALERTS
+# ─────────────────────────────────────────────
+_price_alerts = []  # [{id, item_id, item_name, direction: 'above'|'below', target_price, active}]
+
+@app.route("/api/alerts", methods=["GET"])
+def api_alerts_get():
+    return jsonify({"alerts": _price_alerts})
+
+@app.route("/api/alerts", methods=["POST"])
+def api_alerts_set():
+    data = flask_request.get_json()
+    alert = {
+        "id": len(_price_alerts) + 1,
+        "item_id": data.get("item_id"),
+        "item_name": data.get("item_name", ""),
+        "direction": data.get("direction", "below"),  # 'above' or 'below'
+        "target_price": data.get("target_price", 0),
+        "active": True,
+        "triggered": False,
+    }
+    _price_alerts.append(alert)
+    return jsonify({"ok": True, "alert": alert})
+
+@app.route("/api/alerts/<int:alert_id>", methods=["DELETE"])
+def api_alerts_delete(alert_id):
+    global _price_alerts
+    _price_alerts = [a for a in _price_alerts if a["id"] != alert_id]
+    return jsonify({"ok": True})
+
+@app.route("/api/alerts/check")
+def api_alerts_check():
+    """Check alle actieve alerts tegen huidige prijzen."""
+    try:
+        prices = fetch_prices(); data_1h = fetch_1h()
+        try: data_5m = fetch_5m()
+        except: data_5m = {}
+        triggered = []
+        for a in _price_alerts:
+            if not a["active"]: continue
+            current = round(_best_price(a["item_id"], prices, data_1h, data_5m, "low")) or 0
+            if a["direction"] == "below" and current > 0 and current <= a["target_price"]:
+                a["triggered"] = True; a["current_price"] = current
+                triggered.append(a)
+            elif a["direction"] == "above" and current > 0 and current >= a["target_price"]:
+                a["triggered"] = True; a["current_price"] = current
+                triggered.append(a)
+        return jsonify({"triggered": triggered, "total_active": sum(1 for a in _price_alerts if a["active"])})
+    except Exception as e:
+        return jsonify({"triggered": [], "error": str(e)})
+
+# ─────────────────────────────────────────────
+#  PROFIT TRACKER
+# ─────────────────────────────────────────────
+_profit_log = []  # [{timestamp, method, item, profit, quantity}]
+
+@app.route("/api/profit/log", methods=["POST"])
+def api_profit_log():
+    data = flask_request.get_json()
+    entry = {
+        "timestamp": time.time(),
+        "method": data.get("method", "manual"),
+        "item": data.get("item", ""),
+        "profit": data.get("profit", 0),
+        "quantity": data.get("quantity", 1),
+    }
+    _profit_log.append(entry)
+    return jsonify({"ok": True})
+
+@app.route("/api/profit/summary")
+def api_profit_summary():
+    now = time.time()
+    day_ago = now - 86400
+    week_ago = now - 604800
+    today_entries = [e for e in _profit_log if e["timestamp"] >= day_ago]
+    week_entries = [e for e in _profit_log if e["timestamp"] >= week_ago]
+    today_total = sum(e["profit"] * e["quantity"] for e in today_entries)
+    week_total = sum(e["profit"] * e["quantity"] for e in week_entries)
+    all_total = sum(e["profit"] * e["quantity"] for e in _profit_log)
+    return jsonify({
+        "today": today_total, "week": week_total, "all_time": all_total,
+        "today_count": len(today_entries), "week_count": len(week_entries),
+        "all_count": len(_profit_log), "entries": _profit_log[-50:]  # laatste 50
+    })
+
 @app.route("/api/money/alch")
 def api_money_alch():
     staff = flask_request.args.get("staff", "fire")
@@ -2058,6 +2322,8 @@ tr:last-child td { border-bottom:none; }
     <button class="nav-btn" onclick="showPage('calc')">🧮 Calculator</button>
     <button class="nav-btn" onclick="showPage('herbs')">🌿 Herb Runs</button>
     <button class="nav-btn" onclick="showPage('money')">💸 Money Methods</button>
+    <button class="nav-btn" onclick="showPage('alerts')">🔔 Price Alerts</button>
+    <button class="nav-btn" onclick="showPage('tracker')">📊 Profit Tracker</button>
     <button class="nav-btn" onclick="showPage('settings')">⚙️ Instellingen</button>
     <button class="nav-btn" onclick="showPage('guide')">📖 How To</button>
 </div>
@@ -2219,6 +2485,71 @@ tr:last-child td { border-bottom:none; }
     <div class="section"><div style="padding:0 18px;cursor:pointer" onclick="toggleMmSection('bowcut')"><div class="sh t2" style="margin:0;padding:10px 0">🪓 Bow Cutting (logs) <span id="bowcut-toggle" style="font-size:12px;color:#484f58">▼</span></div></div><div id="bowcut-body"><div id="bowcut-table" style="padding:0 18px 18px"></div></div></div>
 
     <div class="section"><div style="padding:0 18px;cursor:pointer" onclick="toggleMmSection('fletch')"><div class="sh t1" style="margin:0;padding:10px 0">🏹 Stringing Bows <span id="fletch-toggle" style="font-size:12px;color:#484f58">▼</span></div></div><div id="fletch-body"><div id="fletch-table" style="padding:0 18px 18px"></div></div></div>
+
+    <!-- ═══ HERBLORE ═══ -->
+    <div style="margin-top:16px;margin-bottom:4px;font-size:11px;font-weight:700;color:#3fb950;text-transform:uppercase;letter-spacing:1.5px;padding-left:4px">🧪 Herblore</div>
+
+    <div class="section"><div style="padding:0 18px;cursor:pointer" onclick="toggleMmSection('herblore')"><div class="sh t2" style="margin:0;padding:10px 0">🧪 Potion Making <span id="herblore-toggle" style="font-size:12px;color:#484f58">▼</span></div></div><div id="herblore-body"><div id="herblore-table" style="padding:0 18px 18px"></div></div></div>
+
+    <!-- ═══ RUNECRAFTING ═══ -->
+    <div style="margin-top:16px;margin-bottom:4px;font-size:11px;font-weight:700;color:#bc8cff;text-transform:uppercase;letter-spacing:1.5px;padding-left:4px">🔮 Runecrafting</div>
+
+    <div class="section"><div style="padding:0 18px;cursor:pointer" onclick="toggleMmSection('runecraft')"><div class="sh t2" style="margin:0;padding:10px 0">🔮 Rune Crafting <span id="runecraft-toggle" style="font-size:12px;color:#484f58">▼</span></div></div><div id="runecraft-body"><div style="padding:4px 18px"><label style="font-size:12px;color:#8b949e">RC Level: </label><input id="rc-level" type="number" value="99" min="1" max="99" style="width:60px;padding:4px 8px;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:13px" onchange="loadRunecraft()"></div><div id="runecraft-info" style="padding:4px 18px;font-size:12px;color:#8b949e"></div><div id="runecraft-table" style="padding:0 18px 18px"></div></div></div>
+
+    <!-- ═══ HUNTER ═══ -->
+    <div style="margin-top:16px;margin-bottom:4px;font-size:11px;font-weight:700;color:#d29922;text-transform:uppercase;letter-spacing:1.5px;padding-left:4px">🪤 Hunter</div>
+
+    <div class="section"><div style="padding:0 18px;cursor:pointer" onclick="toggleMmSection('hunter')"><div class="sh t2" style="margin:0;padding:10px 0">🐿️ Chinchompas <span id="hunter-toggle" style="font-size:12px;color:#484f58">▼</span></div></div><div id="hunter-body"><div id="hunter-table" style="padding:0 18px 18px"></div></div></div>
+
+    <div class="section"><div style="padding:0 18px;cursor:pointer" onclick="toggleMmSection('birdhouse')"><div class="sh t2" style="margin:0;padding:10px 0">🏠 Birdhouse Runs <span id="birdhouse-toggle" style="font-size:12px;color:#484f58">▼</span></div></div><div id="birdhouse-body"><div id="birdhouse-table" style="padding:0 18px 18px"></div></div></div>
+</div>
+
+<!-- PRICE ALERTS -->
+<div class="page" id="page-alerts">
+    <div class="section">
+        <div class="sh t2">🔔 Price Alerts</div>
+        <div style="padding:14px 18px">
+            <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-bottom:14px">
+                <div><label style="font-size:11px;color:#8b949e;display:block;margin-bottom:4px">Item zoeken</label>
+                <input id="alert-search" type="text" placeholder="Bijv. Dragon claws..." style="width:220px;padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#c9d1d9;font-size:13px" oninput="searchAlertItem()"></div>
+                <div><label style="font-size:11px;color:#8b949e;display:block;margin-bottom:4px">Richting</label>
+                <select id="alert-dir" style="padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#c9d1d9;font-size:13px"><option value="below">Onder ≤</option><option value="above">Boven ≥</option></select></div>
+                <div><label style="font-size:11px;color:#8b949e;display:block;margin-bottom:4px">Prijs (GP)</label>
+                <input id="alert-price" type="number" placeholder="10000" style="width:120px;padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#c9d1d9;font-size:13px"></div>
+                <button onclick="addAlert()" style="padding:8px 16px;background:#238636;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600">+ Alert</button>
+            </div>
+            <div id="alert-search-results" style="margin-bottom:10px"></div>
+            <div id="alert-triggered" style="margin-bottom:14px"></div>
+            <div id="alert-list"></div>
+        </div>
+    </div>
+</div>
+
+<!-- PROFIT TRACKER -->
+<div class="page" id="page-tracker">
+    <div class="section">
+        <div class="sh t2">📊 Profit Tracker</div>
+        <div id="tracker-summary" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:14px 18px"></div>
+    </div>
+    <div class="section">
+        <div class="sh t1" style="justify-content:space-between">📝 Winst Loggen
+            <button onclick="document.getElementById('log-form').style.display=document.getElementById('log-form').style.display==='none'?'':'none'" style="padding:4px 12px;background:#238636;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">+ Toevoegen</button>
+        </div>
+        <div id="log-form" style="padding:14px 18px;display:none;border-bottom:1px solid #30363d">
+            <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">
+                <div><label style="font-size:11px;color:#8b949e;display:block;margin-bottom:4px">Methode</label>
+                <input id="log-method" type="text" placeholder="Bijv. Herb Run, Flipping..." style="width:180px;padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#c9d1d9;font-size:13px"></div>
+                <div><label style="font-size:11px;color:#8b949e;display:block;margin-bottom:4px">Item</label>
+                <input id="log-item" type="text" placeholder="Optioneel" style="width:150px;padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#c9d1d9;font-size:13px"></div>
+                <div><label style="font-size:11px;color:#8b949e;display:block;margin-bottom:4px">Winst (GP)</label>
+                <input id="log-profit" type="number" placeholder="50000" style="width:120px;padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#c9d1d9;font-size:13px"></div>
+                <div><label style="font-size:11px;color:#8b949e;display:block;margin-bottom:4px">Aantal</label>
+                <input id="log-qty" type="number" value="1" min="1" style="width:80px;padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#c9d1d9;font-size:13px"></div>
+                <button onclick="logProfit()" style="padding:8px 16px;background:#238636;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600">Opslaan</button>
+            </div>
+        </div>
+        <div id="tracker-log" style="padding:14px 18px"></div>
+    </div>
 </div>
 
 <!-- INSTELLINGEN -->
@@ -2437,6 +2768,8 @@ function showPage(p) {
     if (p === 'settings') loadSettings();
     if (p === 'herbs') loadHerbRun();
     if (p === 'money') loadMoneyMethods();
+    if (p === 'alerts') loadAlerts();
+    if (p === 'tracker') loadTracker();
 }
 
 // FORMAT
@@ -3207,6 +3540,7 @@ async function loadMoneyMethods() {
     loadPlanks(); loadTan();
     loadCballs(); loadBf();
     loadCooking(); loadFletching(); loadBowCut();
+    loadHerblore(); loadRunecraft(); loadHunter(); loadBirdhouse();
 }
 
 async function loadStaves() {
@@ -3466,6 +3800,194 @@ async function loadFletching() {
         {label:'XP/hr', fn:xpCol},
         {label:'AFK', fn:afkCol},
     ]);
+}
+
+async function loadHerblore() {
+    await loadSimpleSection('/api/money/herblore', 'herblore-table', [
+        {label:'Lvl', fn:i=>`<span style="color:#484f58">${i.lvl}</span>`},
+        {label:'Potion', fn:nameLink},
+        {label:'Herb', fn:i=>`<span style="color:#d29922">${gp(i.herb_price)}</span> <span style="color:#484f58;font-size:10px">${i.herb_name}</span>`},
+        {label:'Secondary', fn:i=>`<span style="color:#d29922">${gp(i.sec_price)}</span> <span style="color:#484f58;font-size:10px">${i.sec_name}</span>`},
+        {label:'Verkoop', fn:i=>gp(i.sell_price)},
+        {label:'Winst', fn:i=>gp(i.profit), style:i=>profitStyle(i)},
+        {label:'GP/hr', fn:i=>gp(i.profit_hr), style:i=>profitStyle(i,'profit_hr')},
+        {label:'XP/hr', fn:xpCol},
+        {label:'AFK', fn:afkCol},
+    ]);
+}
+
+async function loadRunecraft() {
+    let lvl = document.getElementById('rc-level').value || 99;
+    let el = document.getElementById('runecraft-table');
+    el.innerHTML = '<span style="color:#484f58">Laden...</span>';
+    try {
+        let d = await (await fetch(`/api/money/runecraft?level=${lvl}`)).json();
+        if (d.error) { el.innerHTML = `<span style="color:#da3633">${d.error}</span>`; return; }
+        document.getElementById('runecraft-info').innerHTML = `Pure essence: <b>${gp(d.ess_price)}</b> GP | RC Level: <b>${d.rc_level}</b>`;
+        el.innerHTML = buildSimpleTable(d.items, [
+            {label:'Lvl', fn:i=>`<span style="color:#484f58">${i.lvl}</span>`},
+            {label:'Rune', fn:nameLink},
+            {label:'Essence', fn:i=>`<span style="color:#d29922">${gp(i.ess_price)}</span>`},
+            {label:'Multi', fn:i=>`<span style="color:${i.multiplier>1?'#3fb950':'#484f58'}">${i.multiplier}x</span> <span style="color:#484f58;font-size:10px">(${i.multi_lvl}+)</span>`},
+            {label:'Rune prijs', fn:i=>gp(i.rune_price)},
+            {label:'Winst/rune', fn:i=>gp(i.profit), style:i=>profitStyle(i)},
+            {label:'GP/hr', fn:i=>gp(i.profit_hr), style:i=>profitStyle(i,'profit_hr')},
+            {label:'XP/hr', fn:xpCol},
+            {label:'AFK', fn:afkCol},
+        ]);
+    } catch(e) { el.innerHTML = '<span style="color:#da3633">Fout bij laden</span>'; }
+}
+
+async function loadHunter() {
+    await loadSimpleSection('/api/money/hunter', 'hunter-table', [
+        {label:'Lvl', fn:i=>`<span style="color:#484f58">${i.lvl}</span>`},
+        {label:'Chin', fn:nameLink},
+        {label:'Prijs/st', fn:i=>gp(i.sell_price)},
+        {label:'Catch/hr', fn:i=>`<span style="color:#8b949e">${i.rate}</span>`},
+        {label:'GP/hr', fn:i=>gp(i.profit_hr), style:i=>profitStyle(i,'profit_hr')},
+        {label:'XP/hr', fn:xpCol},
+        {label:'AFK', fn:afkCol},
+    ]);
+}
+
+async function loadBirdhouse() {
+    let el = document.getElementById('birdhouse-table');
+    el.innerHTML = '<span style="color:#484f58">Laden...</span>';
+    try {
+        let d = await (await fetch('/api/money/birdhouse')).json();
+        if (d.error) { el.innerHTML = `<span style="color:#da3633">${d.error}</span>`; return; }
+        el.innerHTML = buildSimpleTable(d.items, [
+            {label:'Lvl', fn:i=>`<span style="color:#484f58">${i.lvl}/${i.craft_lvl}</span>`},
+            {label:'Birdhouse', fn:i=>`<span style="color:#58a6ff">${i.name}</span>`},
+            {label:'Log', fn:i=>`<span style="color:#d29922">${gp(i.log_price)}</span>`},
+            {label:'Seeds', fn:i=>`<span style="color:#d29922">${gp(i.seed_price)}</span>`},
+            {label:'Kosten/run', fn:i=>gp(i.cost_run)},
+            {label:'Nests/run', fn:i=>`<span style="color:#8b949e">${i.nests_run}</span>`},
+            {label:'Winst/run', fn:i=>gp(i.profit_run), style:i=>profitStyle(i,'profit_run')},
+            {label:'Winst/dag', fn:i=>gp(i.profit_day), style:i=>profitStyle(i,'profit_day')},
+            {label:'AFK', fn:afkCol},
+        ]);
+    } catch(e) { el.innerHTML = '<span style="color:#da3633">Fout bij laden</span>'; }
+}
+
+// ═══ PRICE ALERTS ═══
+let alertSelectedItem = null;
+function searchAlertItem() {
+    let q = document.getElementById('alert-search').value;
+    let box = document.getElementById('alert-search-results');
+    if (q.length < 2) { box.innerHTML = ''; return; }
+    clearTimeout(qlTimer);
+    qlTimer = setTimeout(async () => {
+        let res = await (await fetch('/api/search?q=' + encodeURIComponent(q))).json();
+        if (!res.results || !res.results.length) { box.innerHTML = '<span style="color:#484f58;font-size:12px">Geen resultaten</span>'; return; }
+        box.innerHTML = res.results.slice(0,5).map(r =>
+            `<div style="padding:6px 10px;cursor:pointer;border-radius:6px;font-size:13px;color:#c9d1d9" onmouseenter="this.style.background='#1c2333'" onmouseleave="this.style.background='none'" onclick="alertSelectedItem={id:${r.id},name:'${r.name.replace(/'/g,"\\'")}'};document.getElementById('alert-search').value='${r.name.replace(/'/g,"\\'")}';document.getElementById('alert-search-results').innerHTML='<span style=\\'color:#3fb950;font-size:12px\\'>✓ ${r.name.replace(/'/g,"\\'")}</span>'">${r.name} <span style="color:#484f58;font-size:11px">Limit: ${r.limit||'?'}</span></div>`
+        ).join('');
+    }, 200);
+}
+
+async function addAlert() {
+    if (!alertSelectedItem) { alert('Selecteer eerst een item'); return; }
+    let dir = document.getElementById('alert-dir').value;
+    let price = parseInt(document.getElementById('alert-price').value);
+    if (!price || price <= 0) { alert('Vul een geldige prijs in'); return; }
+    await fetch('/api/alerts', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({item_id: alertSelectedItem.id, item_name: alertSelectedItem.name, direction: dir, target_price: price})});
+    alertSelectedItem = null;
+    document.getElementById('alert-search').value = '';
+    document.getElementById('alert-price').value = '';
+    document.getElementById('alert-search-results').innerHTML = '';
+    loadAlerts();
+}
+
+async function deleteAlert(id) {
+    await fetch(`/api/alerts/${id}`, {method:'DELETE'});
+    loadAlerts();
+}
+
+async function loadAlerts() {
+    // Check triggered
+    let check = await (await fetch('/api/alerts/check')).json();
+    let trigEl = document.getElementById('alert-triggered');
+    if (check.triggered && check.triggered.length) {
+        trigEl.innerHTML = '<div style="font-weight:600;color:#3fb950;margin-bottom:6px">🔔 Getriggerde alerts!</div>' +
+            check.triggered.map(a => `<div style="background:#1a3a2a;border:1px solid #238636;border-radius:8px;padding:10px 14px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
+                <div><b style="color:#c9d1d9">${a.item_name}</b> — prijs is nu <b style="color:#3fb950">${gp(a.current_price)}</b> GP (target: ${a.direction === 'below' ? '≤' : '≥'} ${gp(a.target_price)})</div>
+                <button onclick="deleteAlert(${a.id})" style="padding:4px 10px;background:#da3633;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11px">Verwijder</button>
+            </div>`).join('');
+    } else { trigEl.innerHTML = ''; }
+    // List all
+    let d = await (await fetch('/api/alerts')).json();
+    let el = document.getElementById('alert-list');
+    if (!d.alerts || !d.alerts.length) { el.innerHTML = '<span style="color:#484f58;font-size:13px">Geen alerts ingesteld. Voeg er een toe hierboven.</span>'; return; }
+    el.innerHTML = '<div style="font-size:12px;font-weight:600;color:#8b949e;margin-bottom:8px">Actieve alerts (' + d.alerts.length + ')</div>' +
+        d.alerts.map(a => `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:8px;margin-bottom:6px">
+            <div><span style="cursor:pointer;color:#58a6ff" onclick="openItemDetail(${a.item_id},'${(a.item_name||'').replace(/'/g,"\\'")}')">${a.item_name}</span>
+            <span style="color:#8b949e;font-size:12px;margin-left:8px">${a.direction === 'below' ? '≤' : '≥'} <b>${gp(a.target_price)}</b> GP</span>
+            ${a.triggered ? '<span style="color:#3fb950;font-size:11px;margin-left:6px">✓ TRIGGERED</span>' : ''}</div>
+            <button onclick="deleteAlert(${a.id})" style="padding:4px 10px;background:#21262d;color:#8b949e;border:1px solid #30363d;border-radius:6px;cursor:pointer;font-size:11px">✕</button>
+        </div>`).join('');
+}
+
+// Auto-check alerts elke 60 sec
+setInterval(async () => {
+    let check = await (await fetch('/api/alerts/check')).json();
+    if (check.triggered && check.triggered.length) {
+        let badge = document.querySelector('[onclick*="alerts"]');
+        if (badge && !badge.textContent.includes('●')) badge.innerHTML = '🔔 Price Alerts <span style="color:#3fb950">●</span>';
+    }
+}, 60000);
+
+// ═══ PROFIT TRACKER ═══
+async function logProfit() {
+    let method = document.getElementById('log-method').value;
+    let item = document.getElementById('log-item').value;
+    let profit = parseInt(document.getElementById('log-profit').value);
+    let qty = parseInt(document.getElementById('log-qty').value) || 1;
+    if (!method || !profit) { alert('Vul methode en winst in'); return; }
+    await fetch('/api/profit/log', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({method, item, profit, quantity: qty})});
+    document.getElementById('log-method').value = '';
+    document.getElementById('log-item').value = '';
+    document.getElementById('log-profit').value = '';
+    document.getElementById('log-qty').value = '1';
+    loadTracker();
+}
+
+async function loadTracker() {
+    let d = await (await fetch('/api/profit/summary')).json();
+    let sumEl = document.getElementById('tracker-summary');
+    let todayCls = d.today >= 0 ? 'color:#3fb950' : 'color:#da3633';
+    let weekCls = d.week >= 0 ? 'color:#3fb950' : 'color:#da3633';
+    let allCls = d.all_time >= 0 ? 'color:#3fb950' : 'color:#da3633';
+    sumEl.innerHTML = `
+        <div style="background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:14px;text-align:center">
+            <div style="color:#8b949e;font-size:11px">Vandaag</div>
+            <div style="${todayCls};font-size:20px;font-weight:700">${gp(d.today)} GP</div>
+            <div style="color:#484f58;font-size:11px">${d.today_count} entries</div>
+        </div>
+        <div style="background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:14px;text-align:center">
+            <div style="color:#8b949e;font-size:11px">Deze week</div>
+            <div style="${weekCls};font-size:20px;font-weight:700">${gp(d.week)} GP</div>
+            <div style="color:#484f58;font-size:11px">${d.week_count} entries</div>
+        </div>
+        <div style="background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:14px;text-align:center">
+            <div style="color:#8b949e;font-size:11px">Totaal</div>
+            <div style="${allCls};font-size:20px;font-weight:700">${gp(d.all_time)} GP</div>
+            <div style="color:#484f58;font-size:11px">${d.all_count} entries</div>
+        </div>`;
+    // Log entries
+    let logEl = document.getElementById('tracker-log');
+    if (!d.entries || !d.entries.length) { logEl.innerHTML = '<span style="color:#484f58;font-size:13px">Nog geen winst gelogd. Gebruik de knop hierboven om te beginnen.</span>'; return; }
+    let h = '<table><tr><th>Tijd</th><th>Methode</th><th>Item</th><th>Winst</th><th>Aantal</th><th>Totaal</th></tr>';
+    d.entries.reverse().forEach(e => {
+        let dt = new Date(e.timestamp * 1000);
+        let time = dt.toLocaleTimeString('nl-NL', {hour:'2-digit',minute:'2-digit'});
+        let date = dt.toLocaleDateString('nl-NL', {day:'numeric',month:'short'});
+        let cls = e.profit >= 0 ? 'color:#3fb950' : 'color:#da3633';
+        h += `<tr><td style="color:#484f58;font-size:12px">${date} ${time}</td><td>${e.method}</td><td style="color:#8b949e">${e.item||'-'}</td><td style="${cls};font-weight:600">${gp(e.profit)}</td><td>${e.quantity}</td><td style="${cls};font-weight:700">${gp(e.profit * e.quantity)}</td></tr>`;
+    });
+    logEl.innerHTML = h + '</table>';
 }
 
 async function loadAlch() {

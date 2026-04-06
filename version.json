@@ -1,6 +1,6 @@
 {
-  "version": "6.3",
-  "changelog": "v6.3: Supply/rune kosten kolommen bij alle money methods, Binding necklace fix, item icons in detail modal.",
+  "version": "6.4",
+  "changelog": "v6.4: Herblore potions, Runecrafting, Hunter (chinchompas), Birdhouse runs, Price Alerts, Profit Tracker.",
   "files": {
     "osrs_webapp.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_webapp.py",
     "osrs_app.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_app.py"
