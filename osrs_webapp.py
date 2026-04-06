@@ -987,6 +987,23 @@ def api_item_history(item_id):
     except Exception as e:
         return jsonify({"error": str(e)})
 
+@app.route("/api/item/<int:item_id>/icon")
+def api_item_icon(item_id):
+    """Geeft de OSRS Wiki icon URL voor een item."""
+    try:
+        with market_lock:
+            mapping = market.get("mapping", {})
+        info = mapping.get(str(item_id), {})
+        icon = info.get("icon", "")
+        if not icon:
+            return jsonify({"icon_url": None})
+        # OSRS Wiki icon URL — spaties worden underscores
+        icon_filename = icon.replace(" ", "_")
+        icon_url = f"https://oldschool.runescape.wiki/images/{icon_filename}"
+        return jsonify({"icon_url": icon_url})
+    except:
+        return jsonify({"icon_url": None})
+
 @app.route("/api/update/restart", methods=["POST"])
 def api_update_restart():
     """Herstart de app na een update via de .app bundle."""
@@ -2366,7 +2383,10 @@ tr:last-child td { border-bottom:none; }
 <div class="modal-bg" id="detail-modal">
     <div class="modal" style="max-width:1200px;width:95vw;max-height:90vh;overflow-y:auto">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-            <h3 id="detail-title" style="margin:0">Item Details</h3>
+            <div style="display:flex;align-items:center;gap:12px">
+                <img id="detail-icon" src="" alt="" style="width:40px;height:40px;display:none;image-rendering:pixelated;border-radius:4px;background:#161b22;padding:2px">
+                <h3 id="detail-title" style="margin:0">Item Details</h3>
+            </div>
             <button onclick="document.getElementById('detail-modal').classList.remove('show')" style="background:none;border:none;color:#8b949e;font-size:22px;cursor:pointer">✕</button>
         </div>
         <div id="detail-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px"></div>
@@ -3865,7 +3885,13 @@ async function openItemDetail(id, name) {
     document.getElementById('detail-title').textContent = name;
     document.getElementById('detail-stats').innerHTML = '<div style="color:#8b949e">Laden...</div>';
     document.getElementById('detail-range-stats').innerHTML = '';
+    let iconEl = document.getElementById('detail-icon');
+    iconEl.style.display = 'none'; iconEl.src = '';
     document.getElementById('detail-modal').classList.add('show');
+    // Load icon from OSRS Wiki
+    fetch(`/api/item/${id}/icon`).then(r=>r.json()).then(d=>{
+        if(d.icon_url){iconEl.src=d.icon_url;iconEl.style.display='block';iconEl.onerror=()=>{iconEl.style.display='none'};}
+    }).catch(()=>{});
     try {
         let r = await fetch(`/api/item/${id}/history`);
         detailData = await r.json();
