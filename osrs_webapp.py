@@ -36,7 +36,7 @@ API_BASE = "https://prices.runescape.wiki/api/v1/osrs"
 # ─────────────────────────────────────────────
 #  AUTO-UPDATE
 # ─────────────────────────────────────────────
-APP_VERSION = "6.4"
+APP_VERSION = "6.5"
 # ⬇️ PAS DIT AAN naar je eigen GitHub repo raw URL
 UPDATE_CHECK_URL = "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/version.json"
 # Het version.json bestand op GitHub moet er zo uitzien:
@@ -886,6 +886,12 @@ def _fast_price(iid, prices, data_1h, data_5m, side="low"):
 def _best_price(iid, prices, data_1h, data_5m, side="low"):
     """Prijsbepaling met VWAP fallback. Prioriteit: 1h avg > VWAP (24u) > instant."""
     sid = str(iid)
+    if side == "avg":
+        # Gemiddelde van high en low
+        low = _best_price(iid, prices, data_1h, data_5m, "low")
+        high = _best_price(iid, prices, data_1h, data_5m, "high")
+        if low and high: return round((low + high) / 2)
+        return low or high or 0
     avg_key = "avgLowPrice" if side == "low" else "avgHighPrice"
     inst_key = side
 
@@ -1744,46 +1750,158 @@ def api_money_bowcut():
 # ─────────────────────────────────────────────
 #  HERBLORE (Potion making)
 # ─────────────────────────────────────────────
+# Crafting ALTIJD = 3-dose potion. Decanten bij Bob Barter (GE) = gratis.
+# 1000 x 3-dose = 750 x 4-dose (3000 doses / 4 = 750)
 VIAL_OF_WATER_ID = 227
 HERBLORE_DATA = [
-    # herb_id = grimy/clean herb, secondary_id, product_id, name, lvl, xp
-    {"herb": 249,  "secondary": 225,   "product": 2434, "name": "Prayer potion",      "lvl": 38, "xp": 87.5,  "herb_name": "Ranarr weed",    "sec_name": "Snape grass"},
-    {"herb": 3000, "secondary": 235,   "product": 3026, "name": "Super restore",      "lvl": 63, "xp": 142.5, "herb_name": "Snapdragon",     "sec_name": "Red spiders' eggs"},
-    {"herb": 2998, "secondary": 6693,  "product": 6685, "name": "Saradomin brew",     "lvl": 81, "xp": 180,   "herb_name": "Toadflax",       "sec_name": "Crushed nest"},
-    {"herb": 267,  "secondary": 245,   "product": 2444, "name": "Ranging potion",     "lvl": 72, "xp": 162.5, "herb_name": "Dwarf weed",     "sec_name": "Wine of zamorak"},
-    {"herb": 2481, "secondary": 6049,  "product": 2452, "name": "Anti-fire potion",   "lvl": 69, "xp": 157.5, "herb_name": "Lantadyme",      "sec_name": "Dragon scale dust"},
-    {"herb": 259,  "secondary": 9736,  "product": 9739, "name": "Super antifire",     "lvl": 85, "xp": 210,   "herb_name": "Lantadyme",      "sec_name": "Crushed superior dragon bones"},
-    {"herb": 263,  "secondary": 245,   "product": 2436, "name": "Super attack",       "lvl": 45, "xp": 100,   "herb_name": "Irit leaf",      "sec_name": "Eye of newt"},
-    {"herb": 265,  "secondary": 221,   "product": 2440, "name": "Super strength",     "lvl": 55, "xp": 125,   "herb_name": "Kwuarm",         "sec_name": "Limpwurt root"},
-    {"herb": 2481, "secondary": 239,   "product": 2442, "name": "Super defence",      "lvl": 66, "xp": 150,   "herb_name": "Cadantine",      "sec_name": "White berries"},
-    {"herb": 269,  "secondary": 2970,  "product": 3040, "name": "Magic potion",       "lvl": 76, "xp": 172.5, "herb_name": "Potato cactus",  "sec_name": "Lantadyme"},
-    {"herb": 2998, "secondary": 1975,  "product": 2428, "name": "Stamina potion",     "lvl": 77, "xp": 102,   "herb_name": "Toadflax",       "sec_name": "Amylase crystal (4x)"},
+    # grimy herb, clean herb, unf potion, secondary, product_3dose, product_4dose
+    {"grimy": 207,  "clean": 257,  "unf": 99,   "secondary": 231,  "p3": 139,  "p4": 2434,
+     "name": "Prayer potion",    "lvl": 38, "xp": 87.5,  "herb_name": "Ranarr weed",    "sec_name": "Snape grass"},
+    {"grimy": 3051, "clean": 3000,"unf": 3004, "secondary": 223,  "p3": 3026, "p4": 3024,
+     "name": "Super restore",    "lvl": 63, "xp": 142.5, "herb_name": "Snapdragon",     "sec_name": "Red spiders' eggs"},
+    {"grimy": 3049, "clean": 2998,"unf": 3002, "secondary": 6693, "p3": 6687, "p4": 6685,
+     "name": "Saradomin brew",   "lvl": 81, "xp": 180,   "herb_name": "Toadflax",       "sec_name": "Crushed nest"},
+    {"grimy": 219,  "clean": 269, "unf": 109,  "secondary": 245,  "p3": 169,  "p4": 2444,
+     "name": "Ranging potion",   "lvl": 72, "xp": 162.5, "herb_name": "Dwarf weed",     "sec_name": "Wine of zamorak"},
+    {"grimy": 217,  "clean": 2481,"unf": 2483, "secondary": 241,  "p3": 2454, "p4": 2452,
+     "name": "Antifire potion",  "lvl": 69, "xp": 157.5, "herb_name": "Lantadyme",      "sec_name": "Dragon scale dust"},
+    {"grimy": 209,  "clean": 259, "unf": 101,  "secondary": 221,  "p3": 149,  "p4": 2436,
+     "name": "Super attack",     "lvl": 45, "xp": 100,   "herb_name": "Irit leaf",      "sec_name": "Eye of newt"},
+    {"grimy": 213,  "clean": 263, "unf": 105,  "secondary": 225,  "p3": 157,  "p4": 2440,
+     "name": "Super strength",   "lvl": 55, "xp": 125,   "herb_name": "Kwuarm",         "sec_name": "Limpwurt root"},
+    {"grimy": 215,  "clean": 265, "unf": 107,  "secondary": 239,  "p3": 163,  "p4": 2442,
+     "name": "Super defence",    "lvl": 66, "xp": 150,   "herb_name": "Cadantine",      "sec_name": "White berries"},
+]
+
+# Herb cleaning data: grimy → clean
+HERB_CLEAN_DATA = [
+    {"grimy": 199,  "clean": 249,  "name": "Guam leaf",      "lvl": 3,   "xp": 2.5},
+    {"grimy": 201,  "clean": 251,  "name": "Marrentill",     "lvl": 5,   "xp": 3.8},
+    {"grimy": 203,  "clean": 253,  "name": "Tarromin",       "lvl": 11,  "xp": 5},
+    {"grimy": 205,  "clean": 255,  "name": "Harralander",    "lvl": 20,  "xp": 6.3},
+    {"grimy": 207,  "clean": 257,  "name": "Ranarr weed",    "lvl": 25,  "xp": 7.5},
+    {"grimy": 209,  "clean": 259,  "name": "Irit leaf",      "lvl": 40,  "xp": 8.8},
+    {"grimy": 211,  "clean": 261,  "name": "Avantoe",        "lvl": 48,  "xp": 10},
+    {"grimy": 213,  "clean": 263,  "name": "Kwuarm",         "lvl": 54,  "xp": 11.3},
+    {"grimy": 3049, "clean": 2998, "name": "Toadflax",       "lvl": 30,  "xp": 8},
+    {"grimy": 3051, "clean": 3000, "name": "Snapdragon",     "lvl": 59,  "xp": 11.8},
+    {"grimy": 215,  "clean": 265,  "name": "Cadantine",      "lvl": 65,  "xp": 12.5},
+    {"grimy": 217,  "clean": 2481, "name": "Lantadyme",      "lvl": 67,  "xp": 13.1},
+    {"grimy": 219,  "clean": 269,  "name": "Dwarf weed",     "lvl": 70,  "xp": 13.8},
+    {"grimy": 221,  "clean": 271,  "name": "Torstol",        "lvl": 75,  "xp": 15},
 ]
 
 @app.route("/api/money/herblore")
 def api_money_herblore():
+    """Herblore potion making met avg prijzen, 3-dose/4-dose, herb vs unf."""
     try:
         prices = fetch_prices(); data_1h = fetch_1h()
         try: data_5m = fetch_5m()
         except: data_5m = {}
-        vial_price = round(_best_price(VIAL_OF_WATER_ID, prices, data_1h, data_5m, "low"))
+        vial_price = round(_best_price(VIAL_OF_WATER_ID, prices, data_1h, data_5m, "avg"))
+        qty = int(flask_request.args.get("qty", "1000"))
         results = []
         for p in HERBLORE_DATA:
-            herb_price = round(_best_price(p["herb"], prices, data_1h, data_5m, "low"))
-            sec_price = round(_best_price(p["secondary"], prices, data_1h, data_5m, "low"))
-            potion_price = round(_best_price(p["product"], prices, data_1h, data_5m, "high"))
-            if not herb_price or not potion_price: continue
-            sec_qty = 4 if "4x" in p.get("sec_name", "") else 1
-            cost = herb_price + (sec_price * sec_qty) + vial_price
-            profit = potion_price - cost
-            rate = 2400  # ~2400 potions/hr (bank standing)
-            results.append({"name": p["name"], "lvl": p["lvl"],
+            herb_price = round(_best_price(p["grimy"], prices, data_1h, data_5m, "avg"))
+            unf_price = round(_best_price(p["unf"], prices, data_1h, data_5m, "avg"))
+            sec_price = round(_best_price(p["secondary"], prices, data_1h, data_5m, "avg"))
+            price_3 = round(_best_price(p["p3"], prices, data_1h, data_5m, "avg"))
+            price_4 = round(_best_price(p["p4"], prices, data_1h, data_5m, "avg"))
+            if not herb_price or not price_3: continue
+
+            # Methode 1: Herb + vial + secondary → 3-dose
+            cost_herb = herb_price + vial_price + sec_price
+            profit_3_herb = price_3 - cost_herb
+
+            # Methode 2: Unf potion + secondary → 3-dose (geen vial nodig)
+            cost_unf = (unf_price + sec_price) if unf_price else 0
+            profit_3_unf = (price_3 - cost_unf) if unf_price else 0
+
+            # Decanten: 1000 x 3-dose → 750 x 4-dose (gratis bij Bob Barter)
+            # Revenue per 1000 gemaakt: 750 * price_4
+            revenue_4_per1k = round((qty * 0.75) * price_4) if price_4 else 0
+            revenue_3_per1k = qty * price_3
+            cost_herb_per1k = qty * cost_herb
+            cost_unf_per1k = qty * cost_unf if unf_price else 0
+
+            profit_3_herb_1k = revenue_3_per1k - cost_herb_per1k
+            profit_4_herb_1k = revenue_4_per1k - cost_herb_per1k
+            profit_3_unf_1k = (revenue_3_per1k - cost_unf_per1k) if unf_price else 0
+            profit_4_unf_1k = (revenue_4_per1k - cost_unf_per1k) if unf_price else 0
+
+            rate = 2400
+            results.append({
+                "name": p["name"], "lvl": p["lvl"],
                 "herb_name": p["herb_name"], "herb_price": herb_price,
-                "sec_name": p["sec_name"], "sec_price": sec_price * sec_qty,
-                "vial_price": vial_price, "cost": cost,
-                "sell_price": potion_price, "profit": profit,
-                "product_id": p["product"],
+                "sec_name": p["sec_name"], "sec_price": sec_price,
+                "unf_price": unf_price, "vial_price": vial_price,
+                "price_3": price_3, "price_4": price_4 or 0,
+                "cost_herb": cost_herb, "cost_unf": cost_unf,
+                "profit_3_herb": profit_3_herb, "profit_3_unf": profit_3_unf,
+                # Per-batch (qty)
+                "qty": qty,
+                "profit_3_herb_batch": profit_3_herb_1k,
+                "profit_4_herb_batch": profit_4_herb_1k,
+                "profit_3_unf_batch": profit_3_unf_1k,
+                "profit_4_unf_batch": profit_4_unf_1k,
+                "four_dose_qty": round(qty * 0.75),
+                "product_id": p["p3"],
                 "xp": p["xp"], "xp_hr": round(p["xp"] * rate),
+                "profit_hr_herb": profit_3_herb * rate,
+                "profit_hr_unf": profit_3_unf * rate,
+                "afk_time": "50 sec per inv",
+            })
+        results.sort(key=lambda x: x["profit_3_herb"], reverse=True)
+        return jsonify({"items": results, "vial_price": vial_price, "qty": qty})
+    except Exception as e:
+        return jsonify({"error": str(e), "items": []})
+
+@app.route("/api/money/herbclean")
+def api_money_herbclean():
+    """Herb cleaning: grimy → clean voor winst."""
+    try:
+        prices = fetch_prices(); data_1h = fetch_1h()
+        try: data_5m = fetch_5m()
+        except: data_5m = {}
+        results = []
+        for h in HERB_CLEAN_DATA:
+            grimy_price = round(_best_price(h["grimy"], prices, data_1h, data_5m, "avg"))
+            clean_price = round(_best_price(h["clean"], prices, data_1h, data_5m, "avg"))
+            if not grimy_price or not clean_price: continue
+            profit = clean_price - grimy_price
+            rate = 5000  # ~5000 herbs/hr (1-tick cleaning)
+            results.append({"name": h["name"], "lvl": h["lvl"],
+                "grimy_price": grimy_price, "clean_price": clean_price,
+                "profit": profit, "product_id": h["clean"],
+                "xp": h["xp"], "xp_hr": round(h["xp"] * rate),
+                "profit_hr": profit * rate, "afk_time": "Click-intensive"})
+        results.sort(key=lambda x: x["profit"], reverse=True)
+        return jsonify({"items": results})
+    except Exception as e:
+        return jsonify({"error": str(e), "items": []})
+
+@app.route("/api/money/unfpotions")
+def api_money_unfpotions():
+    """Unfinished potions maken: herb + vial → unf potion."""
+    try:
+        prices = fetch_prices(); data_1h = fetch_1h()
+        try: data_5m = fetch_5m()
+        except: data_5m = {}
+        vial_price = round(_best_price(VIAL_OF_WATER_ID, prices, data_1h, data_5m, "avg"))
+        results = []
+        for p in HERBLORE_DATA:
+            clean_price = round(_best_price(p["clean"], prices, data_1h, data_5m, "avg"))
+            unf_price = round(_best_price(p["unf"], prices, data_1h, data_5m, "avg"))
+            if not clean_price or not unf_price: continue
+            cost = clean_price + vial_price
+            profit = unf_price - cost
+            rate = 2400
+            results.append({"name": p["name"].replace("potion","").strip() + " potion (unf)",
+                "lvl": p["lvl"], "herb_name": p["herb_name"],
+                "clean_price": clean_price, "vial_price": vial_price,
+                "cost": cost, "sell_price": unf_price,
+                "profit": profit, "product_id": p["unf"],
+                "xp": 0, "xp_hr": 0,
                 "profit_hr": profit * rate, "afk_time": "50 sec per inv"})
         results.sort(key=lambda x: x["profit"], reverse=True)
         return jsonify({"items": results, "vial_price": vial_price})
@@ -2489,7 +2607,11 @@ tr:last-child td { border-bottom:none; }
     <!-- ═══ HERBLORE ═══ -->
     <div style="margin-top:16px;margin-bottom:4px;font-size:11px;font-weight:700;color:#3fb950;text-transform:uppercase;letter-spacing:1.5px;padding-left:4px">🧪 Herblore</div>
 
-    <div class="section"><div style="padding:0 18px;cursor:pointer" onclick="toggleMmSection('herblore')"><div class="sh t2" style="margin:0;padding:10px 0">🧪 Potion Making <span id="herblore-toggle" style="font-size:12px;color:#484f58">▼</span></div></div><div id="herblore-body"><div id="herblore-table" style="padding:0 18px 18px"></div></div></div>
+    <div class="section"><div style="padding:0 18px;cursor:pointer" onclick="toggleMmSection('herblore')"><div class="sh t2" style="margin:0;padding:10px 0">🧪 Potion Making <span id="herblore-toggle" style="font-size:12px;color:#484f58">▼</span></div></div><div id="herblore-body"><div style="padding:8px 18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><label style="font-size:12px;color:#8b949e">Berekening voor:</label><input id="herb-qty" type="number" value="1000" min="1" style="width:80px;padding:4px 8px;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:13px" onchange="loadHerblore()"><span style="font-size:12px;color:#8b949e">potions</span><span style="font-size:11px;color:#484f58">| Prijzen = gemiddelde (avg) | Crafting = altijd 3-dose | Decanten = gratis bij Bob Barter</span></div><div id="herblore-table" style="padding:0 18px 18px"></div></div></div>
+
+    <div class="section"><div style="padding:0 18px;cursor:pointer" onclick="toggleMmSection('herbclean')"><div class="sh t2" style="margin:0;padding:10px 0">🌿 Herb Cleaning <span id="herbclean-toggle" style="font-size:12px;color:#484f58">▼</span></div></div><div id="herbclean-body"><div id="herbclean-table" style="padding:0 18px 18px"></div></div></div>
+
+    <div class="section"><div style="padding:0 18px;cursor:pointer" onclick="toggleMmSection('unfpot')"><div class="sh t2" style="margin:0;padding:10px 0">⚗️ Unfinished Potions <span id="unfpot-toggle" style="font-size:12px;color:#484f58">▼</span></div></div><div id="unfpot-body"><div id="unfpot-table" style="padding:0 18px 18px"></div></div></div>
 
     <!-- ═══ RUNECRAFTING ═══ -->
     <div style="margin-top:16px;margin-bottom:4px;font-size:11px;font-weight:700;color:#bc8cff;text-transform:uppercase;letter-spacing:1.5px;padding-left:4px">🔮 Runecrafting</div>
@@ -3540,7 +3662,8 @@ async function loadMoneyMethods() {
     loadPlanks(); loadTan();
     loadCballs(); loadBf();
     loadCooking(); loadFletching(); loadBowCut();
-    loadHerblore(); loadRunecraft(); loadHunter(); loadBirdhouse();
+    loadHerblore(); loadHerbClean(); loadUnfPotions();
+    loadRunecraft(); loadHunter(); loadBirdhouse();
 }
 
 async function loadStaves() {
@@ -3803,15 +3926,64 @@ async function loadFletching() {
 }
 
 async function loadHerblore() {
-    await loadSimpleSection('/api/money/herblore', 'herblore-table', [
+    let qty = document.getElementById('herb-qty').value || 1000;
+    let el = document.getElementById('herblore-table');
+    el.innerHTML = '<span style="color:#484f58">Laden...</span>';
+    try {
+        let d = await (await fetch(`/api/money/herblore?qty=${qty}`)).json();
+        if (d.error) { el.innerHTML = `<span style="color:#da3633">${d.error}</span>`; return; }
+        if (!d.items || !d.items.length) { el.innerHTML = '<span style="color:#484f58">Geen data</span>'; return; }
+        let q = d.qty;
+        let h = '<table style="font-size:12px"><tr><th>Lvl</th><th>Potion</th><th>Herb (grimy)</th><th>Secondary</th><th>Unf potion</th><th>3-dose</th><th>4-dose</th><th>Winst/st (herb)</th><th>Winst/st (unf)</th><th>${q}x herb → 3d</th><th>${q}x herb → ${Math.round(q*0.75)}x 4d</th><th>XP/hr</th></tr>';
+        h = h.replace(/\$\{q\}/g, q).replace('${Math.round(q*0.75)}', Math.round(q*0.75));
+        d.items.forEach(i => {
+            let cls3h = i.profit_3_herb >= 0 ? 'color:#3fb950' : 'color:#da3633';
+            let cls3u = i.profit_3_unf >= 0 ? 'color:#3fb950' : 'color:#da3633';
+            let clsB3 = i.profit_3_herb_batch >= 0 ? 'color:#3fb950' : 'color:#da3633';
+            let clsB4 = i.profit_4_herb_batch >= 0 ? 'color:#3fb950' : 'color:#da3633';
+            h += `<tr>
+                <td style="color:#484f58">${i.lvl}</td>
+                <td><span style="cursor:pointer;color:#58a6ff" onclick="openItemDetail(${i.product_id},'${i.name.replace(/'/g,"\\'")}')">${i.name}</span></td>
+                <td><span style="color:#d29922">${gp(i.herb_price)}</span> <span style="color:#484f58;font-size:10px">${i.herb_name}</span></td>
+                <td><span style="color:#d29922">${gp(i.sec_price)}</span> <span style="color:#484f58;font-size:10px">${i.sec_name}</span></td>
+                <td style="color:#8b949e">${i.unf_price ? gp(i.unf_price) : '-'}</td>
+                <td>${gp(i.price_3)}</td>
+                <td>${i.price_4 ? gp(i.price_4) : '-'}</td>
+                <td style="${cls3h};font-weight:600">${gp(i.profit_3_herb)}</td>
+                <td style="${cls3u};font-weight:600">${i.unf_price ? gp(i.profit_3_unf) : '-'}</td>
+                <td style="${clsB3};font-weight:700">${gp(i.profit_3_herb_batch)}</td>
+                <td style="${clsB4};font-weight:700">${gp(i.profit_4_herb_batch)}</td>
+                <td><span style="color:#a371f7">${i.xp_hr ? (i.xp_hr/1000).toFixed(1)+'K' : '-'}</span></td>
+            </tr>`;
+        });
+        h += '</table>';
+        h += `<div style="margin-top:8px;font-size:12px;color:#8b949e">⏱️ 50 sec per inv | 💡 Decanten: ${q} x 3-dose = ${Math.round(q*0.75)} x 4-dose (gratis bij Bob Barter, GE). Prijzen = gemiddeld (avg high+low).</div>`;
+        el.innerHTML = h;
+    } catch(e) { el.innerHTML = '<span style="color:#da3633">Fout bij laden</span>'; }
+}
+
+async function loadHerbClean() {
+    await loadSimpleSection('/api/money/herbclean', 'herbclean-table', [
         {label:'Lvl', fn:i=>`<span style="color:#484f58">${i.lvl}</span>`},
-        {label:'Potion', fn:nameLink},
-        {label:'Herb', fn:i=>`<span style="color:#d29922">${gp(i.herb_price)}</span> <span style="color:#484f58;font-size:10px">${i.herb_name}</span>`},
-        {label:'Secondary', fn:i=>`<span style="color:#d29922">${gp(i.sec_price)}</span> <span style="color:#484f58;font-size:10px">${i.sec_name}</span>`},
-        {label:'Verkoop', fn:i=>gp(i.sell_price)},
-        {label:'Winst', fn:i=>gp(i.profit), style:i=>profitStyle(i)},
+        {label:'Herb', fn:nameLink},
+        {label:'Grimy', fn:i=>`<span style="color:#d29922">${gp(i.grimy_price)}</span>`},
+        {label:'Clean', fn:i=>gp(i.clean_price)},
+        {label:'Winst/st', fn:i=>gp(i.profit), style:i=>profitStyle(i)},
         {label:'GP/hr', fn:i=>gp(i.profit_hr), style:i=>profitStyle(i,'profit_hr')},
         {label:'XP/hr', fn:xpCol},
+        {label:'AFK', fn:afkCol},
+    ]);
+}
+
+async function loadUnfPotions() {
+    await loadSimpleSection('/api/money/unfpotions', 'unfpot-table', [
+        {label:'Lvl', fn:i=>`<span style="color:#484f58">${i.lvl}</span>`},
+        {label:'Unf Potion', fn:nameLink},
+        {label:'Clean herb', fn:i=>`<span style="color:#d29922">${gp(i.clean_price)}</span> <span style="color:#484f58;font-size:10px">${i.herb_name}</span>`},
+        {label:'Vial', fn:i=>`<span style="color:#d29922">${gp(i.vial_price)}</span>`},
+        {label:'Verkoop', fn:i=>gp(i.sell_price)},
+        {label:'Winst/st', fn:i=>gp(i.profit), style:i=>profitStyle(i)},
+        {label:'GP/hr', fn:i=>gp(i.profit_hr), style:i=>profitStyle(i,'profit_hr')},
         {label:'AFK', fn:afkCol},
     ]);
 }

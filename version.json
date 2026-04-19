@@ -1,6 +1,6 @@
 {
-  "version": "6.4",
-  "changelog": "v6.4: Herblore potions, Runecrafting, Hunter (chinchompas), Birdhouse runs, Price Alerts, Profit Tracker.",
+  "version": "6.5",
+  "changelog": "v6.5: Herblore compleet herwerkt — correcte item IDs, avg prijzen, 3-dose/4-dose decant berekening, herb cleaning, unf potions, batch calculator.",
   "files": {
     "osrs_webapp.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_webapp.py",
     "osrs_app.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_app.py"
