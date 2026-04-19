@@ -887,11 +887,19 @@ def _best_price(iid, prices, data_1h, data_5m, side="low"):
     """Prijsbepaling met VWAP fallback. Prioriteit: 1h avg > VWAP (24u) > instant."""
     sid = str(iid)
     if side == "avg":
-        # Gemiddelde van high en low
-        low = _best_price(iid, prices, data_1h, data_5m, "low")
-        high = _best_price(iid, prices, data_1h, data_5m, "high")
-        if low and high: return round((low + high) / 2)
-        return low or high or 0
+        # GE marktprijs: 1h gemiddelde van werkelijke trades
+        sid2 = str(iid)
+        avg_h = data_1h.get(sid2, {}).get("avgHighPrice") if data_1h else None
+        avg_l = data_1h.get(sid2, {}).get("avgLowPrice") if data_1h else None
+        if avg_h and avg_l and avg_h > 0 and avg_l > 0:
+            return round((avg_h + avg_l) / 2)
+        if avg_h and avg_h > 0: return avg_h
+        if avg_l and avg_l > 0: return avg_l
+        # Fallback naar instant prijs
+        inst_h = prices.get(sid2, {}).get("high") or 0
+        inst_l = prices.get(sid2, {}).get("low") or 0
+        if inst_h and inst_l: return round((inst_h + inst_l) / 2)
+        return inst_h or inst_l or 0
     avg_key = "avgLowPrice" if side == "low" else "avgHighPrice"
     inst_key = side
 
@@ -2607,7 +2615,7 @@ tr:last-child td { border-bottom:none; }
     <!-- ═══ HERBLORE ═══ -->
     <div style="margin-top:16px;margin-bottom:4px;font-size:11px;font-weight:700;color:#3fb950;text-transform:uppercase;letter-spacing:1.5px;padding-left:4px">🧪 Herblore</div>
 
-    <div class="section"><div style="padding:0 18px;cursor:pointer" onclick="toggleMmSection('herblore')"><div class="sh t2" style="margin:0;padding:10px 0">🧪 Potion Making <span id="herblore-toggle" style="font-size:12px;color:#484f58">▼</span></div></div><div id="herblore-body"><div style="padding:8px 18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><label style="font-size:12px;color:#8b949e">Berekening voor:</label><input id="herb-qty" type="number" value="1000" min="1" style="width:80px;padding:4px 8px;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:13px" onchange="loadHerblore()"><span style="font-size:12px;color:#8b949e">potions</span><span style="font-size:11px;color:#484f58">| Prijzen = gemiddelde (avg) | Crafting = altijd 3-dose | Decanten = gratis bij Bob Barter</span></div><div id="herblore-table" style="padding:0 18px 18px"></div></div></div>
+    <div class="section"><div style="padding:0 18px;cursor:pointer" onclick="toggleMmSection('herblore')"><div class="sh t2" style="margin:0;padding:10px 0">🧪 Potion Making <span id="herblore-toggle" style="font-size:12px;color:#484f58">▼</span></div></div><div id="herblore-body"><div style="padding:8px 18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><label style="font-size:12px;color:#8b949e">Berekening voor:</label><input id="herb-qty" type="number" value="1000" min="1" style="width:80px;padding:4px 8px;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:13px" onchange="loadHerblore()"><span style="font-size:12px;color:#8b949e">potions</span><span style="font-size:11px;color:#484f58">| Prijzen = GE marktprijs | Crafting = altijd 3-dose | Decanten = gratis bij Bob Barter</span></div><div id="herblore-table" style="padding:0 18px 18px"></div></div></div>
 
     <div class="section"><div style="padding:0 18px;cursor:pointer" onclick="toggleMmSection('herbclean')"><div class="sh t2" style="margin:0;padding:10px 0">🌿 Herb Cleaning <span id="herbclean-toggle" style="font-size:12px;color:#484f58">▼</span></div></div><div id="herbclean-body"><div id="herbclean-table" style="padding:0 18px 18px"></div></div></div>
 
@@ -3957,7 +3965,7 @@ async function loadHerblore() {
             </tr>`;
         });
         h += '</table>';
-        h += `<div style="margin-top:8px;font-size:12px;color:#8b949e">⏱️ 50 sec per inv | 💡 Decanten: ${q} x 3-dose = ${Math.round(q*0.75)} x 4-dose (gratis bij Bob Barter, GE). Prijzen = gemiddeld (avg high+low).</div>`;
+        h += `<div style="margin-top:8px;font-size:12px;color:#8b949e">⏱️ 50 sec per inv | 💡 Decanten: ${q} x 3-dose = ${Math.round(q*0.75)} x 4-dose (gratis bij Bob Barter, GE). Prijzen = GE marktprijs (1h gemiddelde).</div>`;
         el.innerHTML = h;
     } catch(e) { el.innerHTML = '<span style="color:#da3633">Fout bij laden</span>'; }
 }
@@ -3980,7 +3988,7 @@ async function loadUnfPotions() {
         {label:'Lvl', fn:i=>`<span style="color:#484f58">${i.lvl}</span>`},
         {label:'Unf Potion', fn:nameLink},
         {label:'Clean herb', fn:i=>`<span style="color:#d29922">${gp(i.clean_price)}</span> <span style="color:#484f58;font-size:10px">${i.herb_name}</span>`},
-        {label:'Vial', fn:i=>`<span style="color:#d29922">${gp(i.vial_price)}</span>`},
+        {label:'Vial of water', fn:i=>`<span style="color:#d29922">${gp(i.vial_price)}</span>`},
         {label:'Verkoop', fn:i=>gp(i.sell_price)},
         {label:'Winst/st', fn:i=>gp(i.profit), style:i=>profitStyle(i)},
         {label:'GP/hr', fn:i=>gp(i.profit_hr), style:i=>profitStyle(i,'profit_hr')},
