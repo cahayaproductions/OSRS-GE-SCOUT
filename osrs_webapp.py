@@ -36,7 +36,7 @@ API_BASE = "https://prices.runescape.wiki/api/v1/osrs"
 # ─────────────────────────────────────────────
 #  AUTO-UPDATE
 # ─────────────────────────────────────────────
-APP_VERSION = "6.5"
+APP_VERSION = "7.0"
 # ⬇️ PAS DIT AAN naar je eigen GitHub repo raw URL
 UPDATE_CHECK_URL = "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/version.json"
 # Het version.json bestand op GitHub moet er zo uitzien:
@@ -2046,6 +2046,200 @@ def api_money_birdhouse():
     except Exception as e:
         return jsonify({"error": str(e), "items": []})
 
+# ═════════════════════════════════════════════
+#  FARMING XP CALCULATOR
+# ═════════════════════════════════════════════
+# OSRS Level → Total XP table
+LEVEL_XP = [0,0,83,174,276,388,512,650,801,969,1154,1358,1584,1833,2107,2411,2746,3115,3523,3973,4470,
+5018,5624,6291,7028,7842,8740,9730,10824,12031,13363,14833,16456,18247,20224,22406,24815,27473,30408,
+33648,37224,41171,45529,50339,55649,61512,67983,75127,83014,91721,101333,111945,123660,136594,150872,
+166636,184040,203254,224466,247886,273742,302288,333804,368599,407015,449428,496254,547953,605032,
+668051,737627,814445,899257,992895,1096278,1210421,1336443,1475581,1629200,1798808,1986068,2192818,
+2421087,2673114,2951373,3258594,3597792,3972294,4385776,4842295,5346332,5902831,6517253,7195629,
+7944614,8771558,9684577,10692629,11805606,13034431]
+
+# ── TREE DATA ──
+FARM_TREES = [
+    {"name": "Oak",    "seed": 5312, "lvl": 15, "xp": 467.3+1356, "growth": "3h 20m", "grow_min": 200,
+     "protect_item": 5968, "protect_name": "Basket of tomatoes", "protect_qty": 1},
+    {"name": "Willow", "seed": 5313, "lvl": 30, "xp": 1456.5, "growth": "4h 40m", "grow_min": 280,
+     "protect_item": 5986, "protect_name": "Basket of apples", "protect_qty": 1},
+    {"name": "Maple",  "seed": 5314, "lvl": 45, "xp": 3403.4, "growth": "5h 20m", "grow_min": 320,
+     "protect_item": 5396, "protect_name": "Basket of oranges", "protect_qty": 1},
+    {"name": "Yew",    "seed": 5315, "lvl": 60, "xp": 7069.9, "growth": "6h 40m", "grow_min": 400,
+     "protect_item": 6016, "protect_name": "Cactus spine", "protect_qty": 10},
+    {"name": "Magic",  "seed": 5316, "lvl": 75, "xp": 13768.3, "growth": "8h", "grow_min": 480,
+     "protect_item": 5974, "protect_name": "Coconut", "protect_qty": 25},
+]
+
+FARM_FRUIT_TREES = [
+    {"name": "Apple tree",      "seed": 5283, "lvl": 27, "xp": 1199.5, "growth": "16h", "grow_min": 960,
+     "protect_item": 5986, "protect_name": "Sweetcorn", "protect_qty": 9},
+    {"name": "Banana tree",     "seed": 5284, "lvl": 33, "xp": 1750.5, "growth": "16h", "grow_min": 960,
+     "protect_item": 5416, "protect_name": "Basket of apples", "protect_qty": 4},
+    {"name": "Orange tree",     "seed": 5285, "lvl": 39, "xp": 2470.2, "growth": "16h", "grow_min": 960,
+     "protect_item": 5406, "protect_name": "Basket of strawberries", "protect_qty": 3},
+    {"name": "Curry tree",      "seed": 5286, "lvl": 42, "xp": 2906.9, "growth": "16h", "grow_min": 960,
+     "protect_item": 5416, "protect_name": "Basket of bananas", "protect_qty": 5},
+    {"name": "Pineapple tree",  "seed": 5287, "lvl": 51, "xp": 4605.7, "growth": "16h", "grow_min": 960,
+     "protect_item": 5982, "protect_name": "Watermelon", "protect_qty": 10},
+    {"name": "Papaya tree",     "seed": 5288, "lvl": 57, "xp": 6146.4, "growth": "16h", "grow_min": 960,
+     "protect_item": 5972, "protect_name": "Pineapple", "protect_qty": 10},
+    {"name": "Palm tree",       "seed": 5289, "lvl": 68, "xp": 10150.1, "growth": "16h", "grow_min": 960,
+     "protect_item": 5972, "protect_name": "Papaya fruit", "protect_qty": 15},
+    {"name": "Dragonfruit tree","seed": 22877,"lvl": 81, "xp": 17335, "growth": "16h", "grow_min": 960,
+     "protect_item": 5974, "protect_name": "Coconut", "protect_qty": 15},
+]
+
+FARM_SPECIAL = [
+    {"name": "Calquat tree",    "seed": 5290, "lvl": 72, "xp": 12096, "growth": "21h 20m", "grow_min": 1280,
+     "type": "calquat", "protect_item": 6018, "protect_name": "Poison ivy berries", "protect_qty": 8},
+    {"name": "Celastrus tree",  "seed": 22869,"lvl": 85, "xp": 14130, "growth": "13h 20m", "grow_min": 800,
+     "type": "celastrus", "protect_item": 3138, "protect_name": "Potato cactus", "protect_qty": 8},
+    {"name": "Redwood tree",    "seed": 22871,"lvl": 90, "xp": 22450, "growth": "4d 6h 40m", "grow_min": 6400,
+     "type": "redwood", "protect_item": 6693, "protect_name": "Dragonfruit", "protect_qty": 6},
+    {"name": "Spirit tree",     "seed": 5317, "lvl": 83, "xp": 19301.8, "growth": "2d 10h 40m", "grow_min": 3520,
+     "type": "spirit", "protect_item": None, "protect_name": "Monkey nuts + ground teeth + monkey bar", "protect_qty": 1},
+    {"name": "Teak tree",       "seed": 21486,"lvl": 35, "xp": 7290, "growth": "3d 13h 20m", "grow_min": 5360,
+     "type": "hardwood", "protect_item": 6059, "protect_name": "Limpwurt root", "protect_qty": 15},
+    {"name": "Mahogany tree",   "seed": 21488,"lvl": 55, "xp": 15720, "growth": "3d 13h 20m", "grow_min": 5360,
+     "type": "hardwood", "protect_item": 3138, "protect_name": "Potato cactus", "protect_qty": 25},
+]
+
+# ── PATCH LOCATIONS ──
+FARM_PATCHES = {
+    "tree": [
+        {"name": "Lumbridge",        "key": "lumb",   "quest": None, "lvl": 1},
+        {"name": "Varrock",          "key": "varr",   "quest": None, "lvl": 1},
+        {"name": "Falador",          "key": "fala",   "quest": None, "lvl": 1},
+        {"name": "Taverly",          "key": "tav",    "quest": None, "lvl": 1},
+        {"name": "Gnome Stronghold", "key": "gnome",  "quest": None, "lvl": 1},
+        {"name": "Farming Guild",    "key": "guild",  "quest": "65 Farming", "lvl": 65},
+    ],
+    "fruit_tree": [
+        {"name": "Gnome Stronghold", "key": "ft_gnome",   "quest": None, "lvl": 1},
+        {"name": "Tree Gnome Village","key": "ft_village", "quest": None, "lvl": 1},
+        {"name": "Brimhaven",        "key": "ft_brim",    "quest": None, "lvl": 1},
+        {"name": "Catherby",         "key": "ft_cath",    "quest": None, "lvl": 1},
+        {"name": "Lletya",           "key": "ft_lletya",  "quest": "Regicide", "lvl": 1},
+        {"name": "Farming Guild",    "key": "ft_guild",   "quest": "85 Farming", "lvl": 85},
+    ],
+    "calquat":   [{"name": "Tai Bwo Wannai", "key": "calq", "quest": None, "lvl": 72}],
+    "celastrus": [{"name": "Farming Guild",  "key": "cela", "quest": "85 Farming", "lvl": 85}],
+    "redwood":   [{"name": "Farming Guild",  "key": "redw", "quest": "90 Farming", "lvl": 90}],
+    "spirit":    [
+        {"name": "Etceteria",       "key": "sp_etc",   "quest": "The Fremennik Trials", "lvl": 83},
+        {"name": "Port Sarim",      "key": "sp_port",  "quest": None, "lvl": 83},
+        {"name": "Brimhaven",       "key": "sp_brim",  "quest": None, "lvl": 91},
+        {"name": "Farming Guild",   "key": "sp_guild", "quest": "85 Farming", "lvl": 83},
+    ],
+    "hardwood":  [
+        {"name": "Fossil Island 1", "key": "hw1", "quest": "Bone Voyage", "lvl": 1},
+        {"name": "Fossil Island 2", "key": "hw2", "quest": "Bone Voyage", "lvl": 1},
+        {"name": "Fossil Island 3", "key": "hw3", "quest": "Bone Voyage", "lvl": 1},
+    ],
+}
+
+@app.route("/api/farming/calc")
+def api_farming_calc():
+    """Farming XP calculator — berekent kosten, runs en tijd."""
+    try:
+        prices = fetch_prices(); data_1h = fetch_1h()
+        try: data_5m = fetch_5m()
+        except: data_5m = {}
+
+        current_lvl = int(flask_request.args.get("current", "1"))
+        target_lvl = int(flask_request.args.get("target", "99"))
+        current_lvl = max(1, min(99, current_lvl))
+        target_lvl = max(current_lvl + 1, min(99, target_lvl))
+
+        current_xp = LEVEL_XP[current_lvl] if current_lvl < len(LEVEL_XP) else 0
+        target_xp = LEVEL_XP[target_lvl] if target_lvl < len(LEVEL_XP) else 13034431
+        xp_needed = target_xp - current_xp
+
+        # Geselecteerde patches (JSON string)
+        import json as _json
+        patches_json = flask_request.args.get("patches", "{}")
+        try: active_patches = _json.loads(patches_json)
+        except: active_patches = {}
+
+        # Bereken voor elke tree type
+        all_types = [
+            {"key": "tree", "label": "Trees", "data": FARM_TREES, "patch_type": "tree"},
+            {"key": "fruit_tree", "label": "Fruit Trees", "data": FARM_FRUIT_TREES, "patch_type": "fruit_tree"},
+        ]
+        for s in FARM_SPECIAL:
+            all_types.append({
+                "key": s["type"], "label": s["name"], "data": [s],
+                "patch_type": s["type"],
+            })
+
+        results = []
+        for ttype in all_types:
+            patches = FARM_PATCHES.get(ttype["patch_type"], [])
+            # Tel actieve patches
+            active_count = sum(1 for p in patches if active_patches.get(p["key"], True))
+            if active_count == 0: continue
+
+            for tree in ttype["data"]:
+                if tree["lvl"] > current_lvl: continue  # Kan deze nog niet planten
+                seed_price = round(_best_price(tree["seed"], prices, data_1h, data_5m, "avg"))
+                protect_price = 0
+                if tree.get("protect_item"):
+                    protect_price = round(_best_price(tree["protect_item"], prices, data_1h, data_5m, "avg"))
+
+                xp_per_run = tree["xp"] * active_count
+                runs_needed = max(1, -(-xp_needed // int(xp_per_run))) if xp_per_run > 0 else 0  # ceil div
+                trees_needed = runs_needed * active_count
+
+                seed_cost_per_run = seed_price * active_count
+                protect_cost_per_run = (protect_price * tree.get("protect_qty", 0)) * active_count
+                total_cost_per_run = seed_cost_per_run + protect_cost_per_run
+
+                seed_cost_total = seed_price * trees_needed
+                protect_cost_total = (protect_price * tree.get("protect_qty", 0)) * trees_needed
+                total_cost = seed_cost_total + protect_cost_total
+
+                # Tijd
+                grow_min = tree.get("grow_min", 0)
+                total_time_min = runs_needed * grow_min
+                total_time_days = round(total_time_min / 1440, 1)
+
+                results.append({
+                    "category": ttype["label"],
+                    "name": tree["name"],
+                    "lvl": tree["lvl"],
+                    "xp_per_tree": tree["xp"],
+                    "xp_per_run": round(xp_per_run),
+                    "growth": tree["growth"],
+                    "grow_min": grow_min,
+                    "patches": active_count,
+                    "runs_needed": runs_needed,
+                    "trees_needed": trees_needed,
+                    "seed_price": seed_price,
+                    "protect_name": tree.get("protect_name", "-"),
+                    "protect_qty": tree.get("protect_qty", 0),
+                    "protect_price_each": protect_price,
+                    "seed_cost_run": seed_cost_per_run,
+                    "protect_cost_run": protect_cost_per_run,
+                    "total_cost_run": total_cost_per_run,
+                    "seed_cost_total": seed_cost_total,
+                    "protect_cost_total": protect_cost_total,
+                    "total_cost": total_cost,
+                    "total_time_days": total_time_days,
+                    "total_xp": round(xp_per_run * runs_needed),
+                })
+
+        return jsonify({
+            "current_lvl": current_lvl, "target_lvl": target_lvl,
+            "current_xp": current_xp, "target_xp": target_xp,
+            "xp_needed": xp_needed,
+            "items": results,
+            "patches": {k: [p for p in v] for k, v in FARM_PATCHES.items()},
+        })
+    except Exception as e:
+        return jsonify({"error": str(e), "items": []})
+
 # ─────────────────────────────────────────────
 #  PRICE ALERTS
 # ─────────────────────────────────────────────
@@ -2448,6 +2642,7 @@ tr:last-child td { border-bottom:none; }
     <button class="nav-btn" onclick="showPage('calc')">🧮 Calculator</button>
     <button class="nav-btn" onclick="showPage('herbs')">🌿 Herb Runs</button>
     <button class="nav-btn" onclick="showPage('money')">💸 Money Methods</button>
+    <button class="nav-btn" onclick="showPage('farming')">🌳 Farming Calc</button>
     <button class="nav-btn" onclick="showPage('alerts')">🔔 Price Alerts</button>
     <button class="nav-btn" onclick="showPage('tracker')">📊 Profit Tracker</button>
     <button class="nav-btn" onclick="showPage('settings')">⚙️ Instellingen</button>
@@ -2724,6 +2919,42 @@ tr:last-child td { border-bottom:none; }
     </div>
 </div>
 
+<!-- FARMING CALCULATOR -->
+<div class="page" id="page-farming">
+    <div class="section">
+        <div class="sh t2">🌳 Farming XP Calculator</div>
+        <div style="padding:18px">
+            <div style="display:flex;gap:16px;align-items:end;flex-wrap:wrap;margin-bottom:18px">
+                <div>
+                    <label style="font-size:11px;color:#8b949e;display:block;margin-bottom:4px">Huidig Level</label>
+                    <input id="farm-current" type="number" value="1" min="1" max="98" style="width:80px;padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#c9d1d9;font-size:14px;font-weight:600">
+                </div>
+                <div>
+                    <label style="font-size:11px;color:#8b949e;display:block;margin-bottom:4px">Doel Level</label>
+                    <input id="farm-target" type="number" value="99" min="2" max="99" style="width:80px;padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#c9d1d9;font-size:14px;font-weight:600">
+                </div>
+                <button onclick="calcFarming()" style="padding:8px 20px;background:#238636;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px">Bereken</button>
+            </div>
+
+            <div style="margin-bottom:18px">
+                <div style="font-size:12px;color:#8b949e;margin-bottom:8px;font-weight:600">Patch Selectie</div>
+                <div id="farm-patches" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="farm-results" style="display:none">
+        <div class="section">
+            <div class="sh t1" id="farm-xp-header">📊 XP Overzicht</div>
+            <div id="farm-xp-summary" style="padding:14px 18px"></div>
+        </div>
+        <div class="section">
+            <div class="sh t1">🌲 Resultaten per Tree Type</div>
+            <div id="farm-table" style="padding:14px 18px;overflow-x:auto"></div>
+        </div>
+    </div>
+</div>
+
 <!-- HOW TO / GUIDE -->
 <div class="page" id="page-guide">
     <div class="section">
@@ -2898,6 +3129,7 @@ function showPage(p) {
     if (p === 'settings') loadSettings();
     if (p === 'herbs') loadHerbRun();
     if (p === 'money') loadMoneyMethods();
+    if (p === 'farming') initFarmingCalc();
     if (p === 'alerts') loadAlerts();
     if (p === 'tracker') loadTracker();
 }
@@ -4168,6 +4400,133 @@ async function loadTracker() {
         h += `<tr><td style="color:#484f58;font-size:12px">${date} ${time}</td><td>${e.method}</td><td style="color:#8b949e">${e.item||'-'}</td><td style="${cls};font-weight:600">${gp(e.profit)}</td><td>${e.quantity}</td><td style="${cls};font-weight:700">${gp(e.profit * e.quantity)}</td></tr>`;
     });
     logEl.innerHTML = h + '</table>';
+}
+
+// ── FARMING CALCULATOR ──
+let farmPatchesData = null;
+let farmPatchState = {};
+
+function initFarmingCalc() {
+    if (farmPatchesData) return; // al geladen
+    // Haal patches op via een lege calc call
+    fetch('/api/farming/calc?current=1&target=2&patches={}')
+        .then(r => r.json())
+        .then(d => {
+            farmPatchesData = d.patches || {};
+            renderFarmPatches();
+        });
+}
+
+function renderFarmPatches() {
+    let el = document.getElementById('farm-patches');
+    if (!farmPatchesData) { el.innerHTML = ''; return; }
+    const labels = {
+        tree: '🌲 Tree Patches', fruit_tree: '🍎 Fruit Tree Patches',
+        calquat: '🌴 Calquat', celastrus: '🌿 Celastrus',
+        redwood: '🪵 Redwood', spirit: '👻 Spirit Tree', hardwood: '🪓 Hardwood'
+    };
+    let h = '';
+    for (let [type, patches] of Object.entries(farmPatchesData)) {
+        h += `<div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px 14px">`;
+        h += `<div style="font-size:12px;font-weight:600;color:#58a6ff;margin-bottom:6px">${labels[type] || type}</div>`;
+        patches.forEach(p => {
+            let key = p.key;
+            if (!(key in farmPatchState)) farmPatchState[key] = true;
+            let checked = farmPatchState[key] ? 'checked' : '';
+            let quest = p.quest ? ` <span style="color:#d29922;font-size:10px">(${p.quest})</span>` : '';
+            h += `<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#c9d1d9;margin:3px 0;cursor:pointer">
+                <input type="checkbox" ${checked} onchange="farmPatchState['${key}']=this.checked" style="accent-color:#238636">
+                ${p.name}${quest}
+            </label>`;
+        });
+        h += `</div>`;
+    }
+    el.innerHTML = h;
+}
+
+async function calcFarming() {
+    let current = parseInt(document.getElementById('farm-current').value) || 1;
+    let target = parseInt(document.getElementById('farm-target').value) || 99;
+    if (target <= current) { alert('Doel level moet hoger zijn dan huidig level'); return; }
+
+    let resultsDiv = document.getElementById('farm-results');
+    resultsDiv.style.display = '';
+    document.getElementById('farm-table').innerHTML = '<span style="color:#484f58">Berekenen...</span>';
+
+    let patchesParam = encodeURIComponent(JSON.stringify(farmPatchState));
+    let d;
+    try { d = await (await fetch(`/api/farming/calc?current=${current}&target=${target}&patches=${patchesParam}`)).json(); }
+    catch(e) { document.getElementById('farm-table').innerHTML = '<span style="color:#da3633">Fout bij laden</span>'; return; }
+    if (d.error) { document.getElementById('farm-table').innerHTML = `<span style="color:#da3633">${d.error}</span>`; return; }
+
+    // XP samenvatting
+    document.getElementById('farm-xp-summary').innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">
+            <div style="background:#161b22;border-radius:8px;padding:12px;text-align:center">
+                <div style="font-size:11px;color:#8b949e">Huidig XP</div>
+                <div style="font-size:18px;font-weight:700;color:#58a6ff">${gp(d.current_xp)}</div>
+                <div style="font-size:12px;color:#8b949e">Level ${d.current_lvl}</div>
+            </div>
+            <div style="background:#161b22;border-radius:8px;padding:12px;text-align:center">
+                <div style="font-size:11px;color:#8b949e">Doel XP</div>
+                <div style="font-size:18px;font-weight:700;color:#3fb950">${gp(d.target_xp)}</div>
+                <div style="font-size:12px;color:#8b949e">Level ${d.target_lvl}</div>
+            </div>
+            <div style="background:#161b22;border-radius:8px;padding:12px;text-align:center">
+                <div style="font-size:11px;color:#8b949e">XP Nodig</div>
+                <div style="font-size:18px;font-weight:700;color:#d29922">${gp(d.xp_needed)}</div>
+            </div>
+        </div>`;
+
+    // Resultaten tabel
+    if (!d.items || !d.items.length) {
+        document.getElementById('farm-table').innerHTML = '<span style="color:#484f58">Geen trees beschikbaar op dit level. Selecteer meer patches of verlaag je huidig level.</span>';
+        return;
+    }
+
+    let h = `<table style="font-size:12px;width:100%"><tr>
+        <th>Type</th><th>Tree</th><th>Lvl</th><th>XP/tree</th><th>Patches</th><th>XP/run</th>
+        <th>Runs</th><th>Groeitijd</th>
+        <th style="color:#3fb950">Seed/run</th><th style="color:#d29922">Protect/run</th><th>Totaal/run</th>
+        <th style="color:#3fb950">Seeds totaal</th><th style="color:#d29922">Protect totaal</th><th style="font-weight:700">Totaal kosten</th>
+        <th>Tijd (dagen)</th>
+    </tr>`;
+    let grandSeed = 0, grandProtect = 0, grandTotal = 0;
+    d.items.forEach(i => {
+        grandSeed += i.seed_cost_total;
+        grandProtect += i.protect_cost_total;
+        grandTotal += i.total_cost;
+        h += `<tr>
+            <td style="color:#58a6ff;font-weight:600">${i.category}</td>
+            <td>${i.name}</td>
+            <td>${i.lvl}</td>
+            <td style="color:#a371f7">${gp(Math.round(i.xp_per_tree))}</td>
+            <td>${i.patches}</td>
+            <td style="color:#a371f7">${gp(i.xp_per_run)}</td>
+            <td style="font-weight:700">${i.runs_needed}</td>
+            <td style="color:#8b949e">${i.growth}</td>
+            <td style="color:#3fb950">${gp(i.seed_cost_run)}</td>
+            <td style="color:#d29922">${gp(i.protect_cost_run)}</td>
+            <td>${gp(i.total_cost_run)}</td>
+            <td style="color:#3fb950">${gp(i.seed_cost_total)}</td>
+            <td style="color:#d29922">${gp(i.protect_cost_total)}</td>
+            <td style="font-weight:700">${gp(i.total_cost)}</td>
+            <td style="color:#8b949e">${i.total_time_days}d</td>
+        </tr>`;
+    });
+    h += `<tr style="border-top:2px solid #30363d;font-weight:700">
+        <td colspan="11" style="text-align:right;padding-right:12px">TOTAAL →</td>
+        <td style="color:#3fb950">${gp(grandSeed)}</td>
+        <td style="color:#d29922">${gp(grandProtect)}</td>
+        <td>${gp(grandTotal)}</td>
+        <td></td>
+    </tr>`;
+    h += '</table>';
+    h += `<div style="margin-top:12px;font-size:11px;color:#484f58">
+        💡 Tip: Protection is optioneel maar voorkomt dat je tree doodgaat. Kosten zijn per patch per run.
+        Protect items: ${d.items.map(i => i.protect_name + ' ×' + i.protect_qty).filter((v,i,a) => a.indexOf(v) === i).join(' | ')}
+    </div>`;
+    document.getElementById('farm-table').innerHTML = h;
 }
 
 async function loadAlch() {

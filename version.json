@@ -1,6 +1,6 @@
 {
-  "version": "6.5",
-  "changelog": "v6.5: Herblore compleet herwerkt — correcte item IDs, avg prijzen, 3-dose/4-dose decant berekening, herb cleaning, unf potions, batch calculator.",
+  "version": "7.0",
+  "changelog": "v7.0: Farming XP Calculator — tree/fruit/special trees, patch selectie, kosten breakdown (seed/protection/totaal), groeitijd, runs berekening.",
   "files": {
     "osrs_webapp.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_webapp.py",
     "osrs_app.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_app.py"
