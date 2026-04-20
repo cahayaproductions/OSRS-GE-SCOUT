@@ -1,6 +1,6 @@
 {
-  "version": "7.1",
-  "changelog": "v7.1: Farming Calculator herwerkt — 1 gewas per categorie selecteren (dropdown), parallelle groei berekening (snellere bomen = meer runs), gecombineerde XP/dag, totale dagen schatting.",
+  "version": "7.2",
+  "changelog": "v7.2: Farming calc — seed vs sapling toggle met prijsvergelijking, default op sapling (wat je daadwerkelijk plant).",
   "files": {
     "osrs_webapp.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_webapp.py",
     "osrs_app.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_app.py"

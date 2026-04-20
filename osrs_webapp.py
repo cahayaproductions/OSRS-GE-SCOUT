@@ -37,7 +37,7 @@ API_BASE = "https://prices.runescape.wiki/api/v1/osrs"
 # ─────────────────────────────────────────────
 #  AUTO-UPDATE
 # ─────────────────────────────────────────────
-APP_VERSION = "7.1"
+APP_VERSION = "7.2"
 # ⬇️ PAS DIT AAN naar je eigen GitHub repo raw URL
 UPDATE_CHECK_URL = "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/version.json"
 # Het version.json bestand op GitHub moet er zo uitzien:
@@ -2060,50 +2060,51 @@ LEVEL_XP = [0,0,83,174,276,388,512,650,801,969,1154,1358,1584,1833,2107,2411,274
 7944614,8771558,9684577,10692629,11805606,13034431]
 
 # ── TREE DATA ──
+# seed = zaad item ID, sapling = sapling item ID (wat je daadwerkelijk plant)
 FARM_TREES = [
-    {"name": "Oak",    "seed": 5312, "lvl": 15, "xp": 467.3+1356, "growth": "3h 20m", "grow_min": 200,
+    {"name": "Oak",    "seed": 5312, "sapling": 5370, "lvl": 15, "xp": 467.3+1356, "growth": "3h 20m", "grow_min": 200,
      "protect_item": 5968, "protect_name": "Basket of tomatoes", "protect_qty": 1},
-    {"name": "Willow", "seed": 5313, "lvl": 30, "xp": 1456.5, "growth": "4h 40m", "grow_min": 280,
+    {"name": "Willow", "seed": 5313, "sapling": 5371, "lvl": 30, "xp": 1456.5, "growth": "4h 40m", "grow_min": 280,
      "protect_item": 5986, "protect_name": "Basket of apples", "protect_qty": 1},
-    {"name": "Maple",  "seed": 5314, "lvl": 45, "xp": 3403.4, "growth": "5h 20m", "grow_min": 320,
+    {"name": "Maple",  "seed": 5314, "sapling": 5372, "lvl": 45, "xp": 3403.4, "growth": "5h 20m", "grow_min": 320,
      "protect_item": 5396, "protect_name": "Basket of oranges", "protect_qty": 1},
-    {"name": "Yew",    "seed": 5315, "lvl": 60, "xp": 7069.9, "growth": "6h 40m", "grow_min": 400,
+    {"name": "Yew",    "seed": 5315, "sapling": 5373, "lvl": 60, "xp": 7069.9, "growth": "6h 40m", "grow_min": 400,
      "protect_item": 6016, "protect_name": "Cactus spine", "protect_qty": 10},
-    {"name": "Magic",  "seed": 5316, "lvl": 75, "xp": 13768.3, "growth": "8h", "grow_min": 480,
+    {"name": "Magic",  "seed": 5316, "sapling": 5374, "lvl": 75, "xp": 13768.3, "growth": "8h", "grow_min": 480,
      "protect_item": 5974, "protect_name": "Coconut", "protect_qty": 25},
 ]
 
 FARM_FRUIT_TREES = [
-    {"name": "Apple tree",      "seed": 5283, "lvl": 27, "xp": 1199.5, "growth": "16h", "grow_min": 960,
+    {"name": "Apple tree",      "seed": 5283, "sapling": 5496, "lvl": 27, "xp": 1199.5, "growth": "16h", "grow_min": 960,
      "protect_item": 5986, "protect_name": "Sweetcorn", "protect_qty": 9},
-    {"name": "Banana tree",     "seed": 5284, "lvl": 33, "xp": 1750.5, "growth": "16h", "grow_min": 960,
+    {"name": "Banana tree",     "seed": 5284, "sapling": 5497, "lvl": 33, "xp": 1750.5, "growth": "16h", "grow_min": 960,
      "protect_item": 5416, "protect_name": "Basket of apples", "protect_qty": 4},
-    {"name": "Orange tree",     "seed": 5285, "lvl": 39, "xp": 2470.2, "growth": "16h", "grow_min": 960,
+    {"name": "Orange tree",     "seed": 5285, "sapling": 5498, "lvl": 39, "xp": 2470.2, "growth": "16h", "grow_min": 960,
      "protect_item": 5406, "protect_name": "Basket of strawberries", "protect_qty": 3},
-    {"name": "Curry tree",      "seed": 5286, "lvl": 42, "xp": 2906.9, "growth": "16h", "grow_min": 960,
+    {"name": "Curry tree",      "seed": 5286, "sapling": 5499, "lvl": 42, "xp": 2906.9, "growth": "16h", "grow_min": 960,
      "protect_item": 5416, "protect_name": "Basket of bananas", "protect_qty": 5},
-    {"name": "Pineapple tree",  "seed": 5287, "lvl": 51, "xp": 4605.7, "growth": "16h", "grow_min": 960,
+    {"name": "Pineapple tree",  "seed": 5287, "sapling": 5500, "lvl": 51, "xp": 4605.7, "growth": "16h", "grow_min": 960,
      "protect_item": 5982, "protect_name": "Watermelon", "protect_qty": 10},
-    {"name": "Papaya tree",     "seed": 5288, "lvl": 57, "xp": 6146.4, "growth": "16h", "grow_min": 960,
+    {"name": "Papaya tree",     "seed": 5288, "sapling": 5501, "lvl": 57, "xp": 6146.4, "growth": "16h", "grow_min": 960,
      "protect_item": 5972, "protect_name": "Pineapple", "protect_qty": 10},
-    {"name": "Palm tree",       "seed": 5289, "lvl": 68, "xp": 10150.1, "growth": "16h", "grow_min": 960,
+    {"name": "Palm tree",       "seed": 5289, "sapling": 5502, "lvl": 68, "xp": 10150.1, "growth": "16h", "grow_min": 960,
      "protect_item": 5972, "protect_name": "Papaya fruit", "protect_qty": 15},
-    {"name": "Dragonfruit tree","seed": 22877,"lvl": 81, "xp": 17335, "growth": "16h", "grow_min": 960,
+    {"name": "Dragonfruit tree","seed": 22877,"sapling": 22878,"lvl": 81, "xp": 17335, "growth": "16h", "grow_min": 960,
      "protect_item": 5974, "protect_name": "Coconut", "protect_qty": 15},
 ]
 
 FARM_SPECIAL = [
-    {"name": "Calquat tree",    "seed": 5290, "lvl": 72, "xp": 12096, "growth": "21h 20m", "grow_min": 1280,
+    {"name": "Calquat tree",    "seed": 5290, "sapling": 5503, "lvl": 72, "xp": 12096, "growth": "21h 20m", "grow_min": 1280,
      "type": "calquat", "protect_item": 6018, "protect_name": "Poison ivy berries", "protect_qty": 8},
-    {"name": "Celastrus tree",  "seed": 22869,"lvl": 85, "xp": 14130, "growth": "13h 20m", "grow_min": 800,
+    {"name": "Celastrus tree",  "seed": 22869,"sapling": 22870,"lvl": 85, "xp": 14130, "growth": "13h 20m", "grow_min": 800,
      "type": "celastrus", "protect_item": 3138, "protect_name": "Potato cactus", "protect_qty": 8},
-    {"name": "Redwood tree",    "seed": 22871,"lvl": 90, "xp": 22450, "growth": "4d 6h 40m", "grow_min": 6400,
+    {"name": "Redwood tree",    "seed": 22871,"sapling": 22872,"lvl": 90, "xp": 22450, "growth": "4d 6h 40m", "grow_min": 6400,
      "type": "redwood", "protect_item": 6693, "protect_name": "Dragonfruit", "protect_qty": 6},
-    {"name": "Spirit tree",     "seed": 5317, "lvl": 83, "xp": 19301.8, "growth": "2d 10h 40m", "grow_min": 3520,
+    {"name": "Spirit tree",     "seed": 5317, "sapling": 5375, "lvl": 83, "xp": 19301.8, "growth": "2d 10h 40m", "grow_min": 3520,
      "type": "spirit", "protect_item": None, "protect_name": "Monkey nuts + ground teeth + monkey bar", "protect_qty": 1},
-    {"name": "Teak tree",       "seed": 21486,"lvl": 35, "xp": 7290, "growth": "3d 13h 20m", "grow_min": 5360,
+    {"name": "Teak tree",       "seed": 21486,"sapling": 21487,"lvl": 35, "xp": 7290, "growth": "3d 13h 20m", "grow_min": 5360,
      "type": "hardwood", "protect_item": 6059, "protect_name": "Limpwurt root", "protect_qty": 15},
-    {"name": "Mahogany tree",   "seed": 21488,"lvl": 55, "xp": 15720, "growth": "3d 13h 20m", "grow_min": 5360,
+    {"name": "Mahogany tree",   "seed": 21488,"sapling": 21489,"lvl": 55, "xp": 15720, "growth": "3d 13h 20m", "grow_min": 5360,
      "type": "hardwood", "protect_item": 3138, "protect_name": "Potato cactus", "protect_qty": 25},
 ]
 
@@ -2166,6 +2167,9 @@ def api_farming_calc():
         selections_json = flask_request.args.get("selections", "{}")
         try: selections = _json.loads(selections_json)
         except: selections = {}
+
+        # seed of sapling prijzen gebruiken
+        buy_type = flask_request.args.get("buy_type", "sapling")  # default = sapling
 
         # ── Bouw lijst van geselecteerde gewassen ──
         active_items = []
@@ -2237,7 +2241,11 @@ def api_farming_calc():
             runs_per_day = 1440.0 / grow_min  # snellere boom → meer runs
             xp_per_day = xp_per_run * runs_per_day
 
-            seed_price = round(_best_price(tree["seed"], prices, data_1h, data_5m, "avg"))
+            # Prijs: seed of sapling (+ toon beide voor vergelijking)
+            price_seed = round(_best_price(tree["seed"], prices, data_1h, data_5m, "avg"))
+            price_sapling = round(_best_price(tree.get("sapling", tree["seed"]), prices, data_1h, data_5m, "avg"))
+            plant_price = price_sapling if buy_type == "sapling" else price_seed
+
             protect_price = 0
             if tree.get("protect_item"):
                 protect_price = round(_best_price(tree["protect_item"], prices, data_1h, data_5m, "avg"))
@@ -2246,10 +2254,11 @@ def api_farming_calc():
                 "grow_min": grow_min, "growth": tree["growth"],
                 "xp_per_run": round(xp_per_run), "runs_per_day": round(runs_per_day, 2),
                 "xp_per_day": round(xp_per_day),
-                "seed_price": seed_price, "protect_price_each": protect_price,
+                "seed_price": plant_price, "price_seed": price_seed, "price_sapling": price_sapling,
+                "protect_price_each": protect_price,
                 "protect_name": tree.get("protect_name", "-"),
                 "protect_qty": tree.get("protect_qty", 0),
-                "seed_cost_per_run": seed_price * cnt,
+                "seed_cost_per_run": plant_price * cnt,
                 "protect_cost_per_run": (protect_price * tree.get("protect_qty", 0)) * cnt,
                 "name": tree["name"], "lvl": tree["lvl"], "xp_per_tree": tree["xp"],
             })
@@ -2277,6 +2286,7 @@ def api_farming_calc():
                 "runs_per_day": it["runs_per_day"], "total_runs": total_runs,
                 "trees_needed": trees_needed,
                 "seed_price": it["seed_price"],
+                "price_seed": it["price_seed"], "price_sapling": it["price_sapling"],
                 "protect_name": it["protect_name"], "protect_qty": it["protect_qty"],
                 "protect_price_each": it["protect_price_each"],
                 "seed_cost_run": it["seed_cost_per_run"],
@@ -2295,6 +2305,7 @@ def api_farming_calc():
             "days_needed": days_needed,
             "items": results,
             "grand_seed": grand_seed, "grand_protect": grand_protect, "grand_total": grand_total,
+            "buy_type": buy_type,
             **meta,
         })
     except Exception as e:
@@ -2993,6 +3004,13 @@ tr:last-child td { border-bottom:none; }
                 <div>
                     <label style="font-size:11px;color:#8b949e;display:block;margin-bottom:4px">Doel Level</label>
                     <input id="farm-target" type="number" value="99" min="2" max="99" style="width:80px;padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#c9d1d9;font-size:14px;font-weight:600">
+                </div>
+                <div>
+                    <label style="font-size:11px;color:#8b949e;display:block;margin-bottom:4px">Prijzen op basis van</label>
+                    <select id="farm-buy-type" style="padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#c9d1d9;font-size:13px">
+                        <option value="sapling" selected>Saplings (kant-en-klaar)</option>
+                        <option value="seed">Seeds (zelf kweken)</option>
+                    </select>
                 </div>
                 <button onclick="calcFarming()" style="padding:8px 20px;background:#238636;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px">Bereken</button>
             </div>
@@ -4583,6 +4601,8 @@ async function calcFarming() {
         alert('Selecteer minstens 1 gewas'); return;
     }
 
+    let buyType = document.getElementById('farm-buy-type').value;
+
     let resultsDiv = document.getElementById('farm-results');
     resultsDiv.style.display = '';
     document.getElementById('farm-table').innerHTML = '<span style="color:#484f58">Berekenen...</span>';
@@ -4591,9 +4611,11 @@ async function calcFarming() {
     let selectionsParam = encodeURIComponent(JSON.stringify(selections));
     let d;
     try {
-        d = await (await fetch(`/api/farming/calc?current=${current}&target=${target}&patches=${patchesParam}&selections=${selectionsParam}`)).json();
+        d = await (await fetch(`/api/farming/calc?current=${current}&target=${target}&patches=${patchesParam}&selections=${selectionsParam}&buy_type=${buyType}`)).json();
     } catch(e) { document.getElementById('farm-table').innerHTML = '<span style="color:#da3633">Fout bij laden</span>'; return; }
     if (d.error) { document.getElementById('farm-table').innerHTML = `<span style="color:#da3633">${d.error}</span>`; return; }
+
+    let buyLabel = buyType === 'sapling' ? 'Sapling' : 'Seed';
 
     // XP samenvatting met dagen
     document.getElementById('farm-xp-summary').innerHTML = `
@@ -4627,13 +4649,31 @@ async function calcFarming() {
         return;
     }
 
+    // Prijsvergelijking seed vs sapling
+    let priceComp = '<div style="margin-bottom:14px;background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px 16px">';
+    priceComp += `<div style="font-size:12px;font-weight:600;color:#58a6ff;margin-bottom:6px">Prijsvergelijking Seed vs Sapling</div>`;
+    priceComp += '<table style="font-size:11px;width:auto"><tr><th>Gewas</th><th>Seed prijs</th><th>Sapling prijs</th><th>Verschil</th></tr>';
+    d.items.forEach(i => {
+        let diff = i.price_sapling - i.price_seed;
+        let diffCls = diff > 0 ? 'color:#da3633' : diff < 0 ? 'color:#3fb950' : 'color:#8b949e';
+        let diffSign = diff > 0 ? '+' : '';
+        priceComp += `<tr>
+            <td>${i.name}</td>
+            <td ${buyType==='seed'?'style="font-weight:700;color:#3fb950"':'style="color:#8b949e"'}>${gp(i.price_seed)}</td>
+            <td ${buyType==='sapling'?'style="font-weight:700;color:#3fb950"':'style="color:#8b949e"'}>${gp(i.price_sapling)}</td>
+            <td style="${diffCls}">${diffSign}${gp(diff)}</td>
+        </tr>`;
+    });
+    priceComp += '</table></div>';
+
     // Resultaten tabel
-    let h = `<table style="font-size:12px;width:100%"><tr>
+    let h = priceComp;
+    h += `<table style="font-size:12px;width:100%"><tr>
         <th>Gewas</th><th>Lvl</th><th>XP/tree</th><th>Patches</th>
         <th>Groeitijd</th><th>Runs/dag</th><th style="color:#a371f7">XP/dag</th>
         <th>Totale runs</th><th>Trees totaal</th>
-        <th style="color:#3fb950">Seed/run</th><th style="color:#d29922">Protect/run</th><th>Totaal/run</th>
-        <th style="color:#3fb950">Seeds totaal</th><th style="color:#d29922">Protect totaal</th><th style="font-weight:700">Kosten</th>
+        <th style="color:#3fb950">${buyLabel}/run</th><th style="color:#d29922">Protect/run</th><th>Totaal/run</th>
+        <th style="color:#3fb950">${buyLabel}s totaal</th><th style="color:#d29922">Protect totaal</th><th style="font-weight:700">Kosten</th>
     </tr>`;
     d.items.forEach(i => {
         h += `<tr>
