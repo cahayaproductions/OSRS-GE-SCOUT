@@ -1,6 +1,6 @@
 {
-  "version": "7.2",
-  "changelog": "v7.2: Farming calc — seed vs sapling toggle met prijsvergelijking, default op sapling (wat je daadwerkelijk plant).",
+  "version": "7.3",
+  "changelog": "v7.3: Farming calc — speeltijd venster (van-tot), max runs/dag cap, realistisch dagelijks schema met tijden, seed/sapling prijsvergelijking.",
   "files": {
     "osrs_webapp.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_webapp.py",
     "osrs_app.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_app.py"

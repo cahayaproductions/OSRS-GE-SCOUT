@@ -37,7 +37,7 @@ API_BASE = "https://prices.runescape.wiki/api/v1/osrs"
 # ─────────────────────────────────────────────
 #  AUTO-UPDATE
 # ─────────────────────────────────────────────
-APP_VERSION = "7.2"
+APP_VERSION = "7.3"
 # ⬇️ PAS DIT AAN naar je eigen GitHub repo raw URL
 UPDATE_CHECK_URL = "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/version.json"
 # Het version.json bestand op GitHub moet er zo uitzien:
@@ -2171,6 +2171,16 @@ def api_farming_calc():
         # seed of sapling prijzen gebruiken
         buy_type = flask_request.args.get("buy_type", "sapling")  # default = sapling
 
+        # Speeltijd venster en max runs
+        play_start = int(flask_request.args.get("play_start", "8"))   # uur (0-23)
+        play_end = int(flask_request.args.get("play_end", "23"))      # uur (0-23)
+        max_runs_cap = int(flask_request.args.get("max_runs", "0"))   # 0 = geen cap
+        play_start = max(0, min(23, play_start))
+        play_end = max(1, min(24, play_end))
+        if play_end <= play_start:
+            play_end = min(play_start + 1, 24)
+        available_hours = play_end - play_start
+
         # ── Bouw lijst van geselecteerde gewassen ──
         active_items = []
 
@@ -2233,13 +2243,44 @@ def api_farming_calc():
                 **meta,
             })
 
-        # ── Bereken XP/dag per gewas (parallel groei) ──
+        # ── Bereken XP/dag per gewas (realistisch op basis van speeltijd) ──
+        schedule_items = []
         for it in active_items:
             tree = it["tree"]; cnt = it["patches"]
             grow_min = tree.get("grow_min", 480)
+            grow_hours = grow_min / 60.0
             xp_per_run = tree["xp"] * cnt
-            runs_per_day = 1440.0 / grow_min  # snellere boom → meer runs
+
+            # Realistische runs/dag:
+            # 1e run = ochtend (overnight harvest), daarna elke grow_hours een nieuwe
+            if grow_hours <= available_hours:
+                realistic_runs = 1 + int(available_hours / grow_hours)
+            elif grow_hours <= 24:
+                realistic_runs = 1  # 1x per dag (groeit overnight)
+            else:
+                # Langzame bomen (redwood, spirit): 1 run per X dagen
+                realistic_runs = round(24.0 / grow_hours, 3)  # bijv. 0.235
+
+            # User cap toepassen
+            if max_runs_cap > 0 and realistic_runs > max_runs_cap:
+                realistic_runs = max_runs_cap
+
+            runs_per_day = realistic_runs
             xp_per_day = xp_per_run * runs_per_day
+
+            # Schema: wanneer te checken
+            run_times = []
+            if grow_hours <= available_hours and runs_per_day >= 1:
+                t = play_start
+                for r in range(int(runs_per_day)):
+                    hh = int(t); mm = int((t - hh) * 60)
+                    run_times.append(f"{hh:02d}:{mm:02d}")
+                    t += grow_hours
+                    if t >= play_end: break
+            elif grow_hours <= 24:
+                run_times.append(f"{play_start:02d}:00")
+            else:
+                run_times.append(f"elke {math.ceil(grow_hours/24)} dagen")
 
             # Prijs: seed of sapling (+ toon beide voor vergelijking)
             price_seed = round(_best_price(tree["seed"], prices, data_1h, data_5m, "avg"))
@@ -2254,6 +2295,7 @@ def api_farming_calc():
                 "grow_min": grow_min, "growth": tree["growth"],
                 "xp_per_run": round(xp_per_run), "runs_per_day": round(runs_per_day, 2),
                 "xp_per_day": round(xp_per_day),
+                "run_times": run_times,
                 "seed_price": plant_price, "price_seed": price_seed, "price_sapling": price_sapling,
                 "protect_price_each": protect_price,
                 "protect_name": tree.get("protect_name", "-"),
@@ -2283,7 +2325,8 @@ def api_farming_calc():
                 "xp_per_tree": it["xp_per_tree"], "xp_per_run": it["xp_per_run"],
                 "xp_per_day": it["xp_per_day"], "growth": it["growth"],
                 "grow_min": it["grow_min"], "patches": it["patches"],
-                "runs_per_day": it["runs_per_day"], "total_runs": total_runs,
+                "runs_per_day": it["runs_per_day"], "run_times": it.get("run_times", []),
+                "total_runs": total_runs,
                 "trees_needed": trees_needed,
                 "seed_price": it["seed_price"],
                 "price_seed": it["price_seed"], "price_sapling": it["price_sapling"],
@@ -2306,6 +2349,8 @@ def api_farming_calc():
             "items": results,
             "grand_seed": grand_seed, "grand_protect": grand_protect, "grand_total": grand_total,
             "buy_type": buy_type,
+            "play_start": play_start, "play_end": play_end, "available_hours": available_hours,
+            "max_runs_cap": max_runs_cap,
             **meta,
         })
     except Exception as e:
@@ -3006,10 +3051,24 @@ tr:last-child td { border-bottom:none; }
                     <input id="farm-target" type="number" value="99" min="2" max="99" style="width:80px;padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#c9d1d9;font-size:14px;font-weight:600">
                 </div>
                 <div>
-                    <label style="font-size:11px;color:#8b949e;display:block;margin-bottom:4px">Prijzen op basis van</label>
-                    <select id="farm-buy-type" style="padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#c9d1d9;font-size:13px">
-                        <option value="sapling" selected>Saplings (kant-en-klaar)</option>
-                        <option value="seed">Seeds (zelf kweken)</option>
+                    <label style="font-size:11px;color:#8b949e;display:block;margin-bottom:4px">Speeltijd van</label>
+                    <input id="farm-play-start" type="number" value="8" min="0" max="23" style="width:60px;padding:8px 10px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#c9d1d9;font-size:14px;font-weight:600;text-align:center">
+                    <span style="color:#8b949e;font-size:12px">:00</span>
+                </div>
+                <div>
+                    <label style="font-size:11px;color:#8b949e;display:block;margin-bottom:4px">Tot</label>
+                    <input id="farm-play-end" type="number" value="23" min="1" max="24" style="width:60px;padding:8px 10px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#c9d1d9;font-size:14px;font-weight:600;text-align:center">
+                    <span style="color:#8b949e;font-size:12px">:00</span>
+                </div>
+                <div>
+                    <label style="font-size:11px;color:#8b949e;display:block;margin-bottom:4px">Max runs/dag</label>
+                    <input id="farm-max-runs" type="number" value="0" min="0" max="20" placeholder="0 = geen limiet" style="width:70px;padding:8px 10px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#c9d1d9;font-size:14px;text-align:center">
+                </div>
+                <div>
+                    <label style="font-size:11px;color:#8b949e;display:block;margin-bottom:4px">Prijzen</label>
+                    <select id="farm-buy-type" style="padding:8px 10px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#c9d1d9;font-size:12px">
+                        <option value="sapling" selected>Saplings</option>
+                        <option value="seed">Seeds</option>
                     </select>
                 </div>
                 <button onclick="calcFarming()" style="padding:8px 20px;background:#238636;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px">Bereken</button>
@@ -4602,6 +4661,9 @@ async function calcFarming() {
     }
 
     let buyType = document.getElementById('farm-buy-type').value;
+    let playStart = parseInt(document.getElementById('farm-play-start').value) || 8;
+    let playEnd = parseInt(document.getElementById('farm-play-end').value) || 23;
+    let maxRuns = parseInt(document.getElementById('farm-max-runs').value) || 0;
 
     let resultsDiv = document.getElementById('farm-results');
     resultsDiv.style.display = '';
@@ -4611,15 +4673,16 @@ async function calcFarming() {
     let selectionsParam = encodeURIComponent(JSON.stringify(selections));
     let d;
     try {
-        d = await (await fetch(`/api/farming/calc?current=${current}&target=${target}&patches=${patchesParam}&selections=${selectionsParam}&buy_type=${buyType}`)).json();
+        d = await (await fetch(`/api/farming/calc?current=${current}&target=${target}&patches=${patchesParam}&selections=${selectionsParam}&buy_type=${buyType}&play_start=${playStart}&play_end=${playEnd}&max_runs=${maxRuns}`)).json();
     } catch(e) { document.getElementById('farm-table').innerHTML = '<span style="color:#da3633">Fout bij laden</span>'; return; }
     if (d.error) { document.getElementById('farm-table').innerHTML = `<span style="color:#da3633">${d.error}</span>`; return; }
 
     let buyLabel = buyType === 'sapling' ? 'Sapling' : 'Seed';
 
     // XP samenvatting met dagen
+    let ps = d.play_start || 8, pe = d.play_end || 23;
     document.getElementById('farm-xp-summary').innerHTML = `
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px">
             <div style="background:#161b22;border-radius:8px;padding:12px;text-align:center">
                 <div style="font-size:11px;color:#8b949e">Huidig XP</div>
                 <div style="font-size:18px;font-weight:700;color:#58a6ff">${gp(d.current_xp)}</div>
@@ -4638,6 +4701,11 @@ async function calcFarming() {
                 <div style="font-size:11px;color:#8b949e">XP / Dag</div>
                 <div style="font-size:18px;font-weight:700;color:#a371f7">${gp(d.total_xp_per_day)}</div>
             </div>
+            <div style="background:#161b22;border-radius:8px;padding:12px;text-align:center">
+                <div style="font-size:11px;color:#8b949e">Speeltijd</div>
+                <div style="font-size:16px;font-weight:700;color:#c9d1d9">${ps}:00 — ${pe}:00</div>
+                <div style="font-size:12px;color:#8b949e">${d.available_hours}h beschikbaar</div>
+            </div>
             <div style="background:#238636;border-radius:8px;padding:12px;text-align:center">
                 <div style="font-size:11px;color:#ffffffcc">Geschatte Tijd</div>
                 <div style="font-size:22px;font-weight:700;color:#fff">${d.days_needed} dagen</div>
@@ -4649,9 +4717,23 @@ async function calcFarming() {
         return;
     }
 
-    // Prijsvergelijking seed vs sapling
+    // ── Dagelijks schema ──
+    let sched = '<div style="margin-bottom:14px;background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px 16px">';
+    sched += '<div style="font-size:12px;font-weight:600;color:#58a6ff;margin-bottom:8px">Dagelijks Schema</div>';
+    sched += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">';
+    d.items.forEach(i => {
+        let times = (i.run_times || []).join(', ') || '-';
+        sched += `<div style="background:#0d1117;border-radius:6px;padding:8px 12px">
+            <div style="font-size:12px;font-weight:600;color:#c9d1d9">${i.name}</div>
+            <div style="font-size:11px;color:#8b949e;margin-top:2px">${i.runs_per_day}x/dag — groei: ${i.growth}</div>
+            <div style="font-size:12px;color:#3fb950;margin-top:4px;font-weight:600">${times}</div>
+        </div>`;
+    });
+    sched += '</div></div>';
+
+    // ── Prijsvergelijking seed vs sapling ──
     let priceComp = '<div style="margin-bottom:14px;background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px 16px">';
-    priceComp += `<div style="font-size:12px;font-weight:600;color:#58a6ff;margin-bottom:6px">Prijsvergelijking Seed vs Sapling</div>`;
+    priceComp += '<div style="font-size:12px;font-weight:600;color:#58a6ff;margin-bottom:6px">Prijsvergelijking Seed vs Sapling</div>';
     priceComp += '<table style="font-size:11px;width:auto"><tr><th>Gewas</th><th>Seed prijs</th><th>Sapling prijs</th><th>Verschil</th></tr>';
     d.items.forEach(i => {
         let diff = i.price_sapling - i.price_seed;
@@ -4666,8 +4748,8 @@ async function calcFarming() {
     });
     priceComp += '</table></div>';
 
-    // Resultaten tabel
-    let h = priceComp;
+    // ── Resultaten tabel ──
+    let h = sched + priceComp;
     h += `<table style="font-size:12px;width:100%"><tr>
         <th>Gewas</th><th>Lvl</th><th>XP/tree</th><th>Patches</th>
         <th>Groeitijd</th><th>Runs/dag</th><th style="color:#a371f7">XP/dag</th>
@@ -4702,7 +4784,7 @@ async function calcFarming() {
     </tr>`;
     h += '</table>';
     h += `<div style="margin-top:14px;font-size:11px;color:#484f58;line-height:1.6">
-        💡 Alle gewassen groeien tegelijk. Snellere bomen worden vaker geplant in dezelfde periode.<br>
+        💡 Runs zijn berekend op basis van je speeltijd (${ps}:00-${pe}:00). Snellere bomen passen vaker in je venster.<br>
         Protection is optioneel maar voorkomt dat je tree doodgaat.
         ${d.items.map(i => '<b>' + i.name + '</b>: ' + i.protect_name + ' x' + i.protect_qty).join(' | ')}
     </div>`;
