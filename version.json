@@ -1,6 +1,6 @@
 {
-  "version": "7.4",
-  "changelog": "v7.4: Hiscores lookup — haalt automatisch je Farming level op via je RSN uit Instellingen. Auto-lookup bij openen farming calc.",
+  "version": "7.5",
+  "changelog": "v7.5: Fix white screen — dubbele hiscores endpoint verwijderd, gebruikt nu bestaande /api/hiscores met RSN uit instellingen.",
   "files": {
     "osrs_webapp.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_webapp.py",
     "osrs_app.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_app.py"
