@@ -13,9 +13,11 @@ def start_server():
     # Check of er updates staan in ~/.osrs_agent/updates/
     update_dir = os.path.join(os.path.expanduser("~"), ".osrs_agent", "updates")
     updated_webapp = os.path.join(update_dir, "osrs_webapp.py")
+    use_update = False
     if os.path.exists(updated_webapp):
         if update_dir not in sys.path:
             sys.path.insert(0, update_dir)
+        use_update = True
     # Fallback: check Resources map (voor niet-PyInstaller builds)
     elif hasattr(sys, '_MEIPASS'):
         exe = os.path.realpath(sys.executable)
@@ -23,8 +25,30 @@ def start_server():
         if os.path.exists(os.path.join(resources, "osrs_webapp.py")):
             if resources not in sys.path:
                 sys.path.insert(0, resources)
-    import osrs_webapp
-    osrs_webapp.app.run(host="127.0.0.1", port=5050, debug=False, use_reloader=False)
+    try:
+        import osrs_webapp
+        osrs_webapp.app.run(host="127.0.0.1", port=5050, debug=False, use_reloader=False)
+    except Exception as e:
+        # Als de update kapot is: verwijder hem en probeer de bundled versie
+        if use_update:
+            print(f"[OSRS GE Scout] Update kapot ({e}), verwijder en val terug op bundled versie...")
+            try:
+                os.remove(updated_webapp)
+                # Verwijder ook osrs_app.py uit updates als die er staat
+                updated_app = os.path.join(update_dir, "osrs_app.py")
+                if os.path.exists(updated_app):
+                    os.remove(updated_app)
+            except: pass
+            # Verwijder de update dir uit sys.path en reload
+            if update_dir in sys.path:
+                sys.path.remove(update_dir)
+            # Probeer opnieuw met bundled versie
+            if 'osrs_webapp' in sys.modules:
+                del sys.modules['osrs_webapp']
+            import osrs_webapp
+            osrs_webapp.app.run(host="127.0.0.1", port=5050, debug=False, use_reloader=False)
+        else:
+            raise
 
 def port_open():
     """Snelle check of poort 5050 luistert."""
