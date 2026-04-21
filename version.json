@@ -1,6 +1,6 @@
 {
-  "version": "7.3",
-  "changelog": "v7.3: Farming calc — speeltijd venster (van-tot), max runs/dag cap, realistisch dagelijks schema met tijden, seed/sapling prijsvergelijking.",
+  "version": "7.4",
+  "changelog": "v7.4: Hiscores lookup — haalt automatisch je Farming level op via je RSN uit Instellingen. Auto-lookup bij openen farming calc.",
   "files": {
     "osrs_webapp.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_webapp.py",
     "osrs_app.py": "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/osrs_app.py"

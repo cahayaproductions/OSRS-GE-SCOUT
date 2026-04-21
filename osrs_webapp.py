@@ -37,7 +37,7 @@ API_BASE = "https://prices.runescape.wiki/api/v1/osrs"
 # ─────────────────────────────────────────────
 #  AUTO-UPDATE
 # ─────────────────────────────────────────────
-APP_VERSION = "7.3"
+APP_VERSION = "7.4"
 # ⬇️ PAS DIT AAN naar je eigen GitHub repo raw URL
 UPDATE_CHECK_URL = "https://raw.githubusercontent.com/cahayaproductions/OSRS-GE-SCOUT/main/version.json"
 # Het version.json bestand op GitHub moet er zo uitzien:
@@ -2357,6 +2357,42 @@ def api_farming_calc():
         return jsonify({"error": str(e), "items": []})
 
 # ─────────────────────────────────────────────
+#  HISCORES LOOKUP
+# ─────────────────────────────────────────────
+SKILL_ORDER = [
+    "Overall", "Attack", "Defence", "Strength", "Hitpoints", "Ranged",
+    "Prayer", "Magic", "Cooking", "Woodcutting", "Fletching", "Fishing",
+    "Firemaking", "Crafting", "Smithing", "Mining", "Herblore", "Agility",
+    "Thieving", "Slayer", "Farming", "Runecrafting", "Hunter", "Construction",
+]
+
+@app.route("/api/hiscores/<username>")
+def api_hiscores(username):
+    """Haal skill levels + XP op van de OSRS hiscores."""
+    try:
+        url = f"https://secure.runescape.com/m=hiscore_oldschool/index_lite.ws?player={username}"
+        resp = requests.get(url, timeout=8, headers={"User-Agent": USER_AGENT})
+        if resp.status_code == 404:
+            return jsonify({"error": "Speler niet gevonden", "skills": {}})
+        if resp.status_code != 200:
+            return jsonify({"error": f"Hiscores API fout ({resp.status_code})", "skills": {}})
+
+        lines = resp.text.strip().split("\n")
+        skills = {}
+        for i, skill_name in enumerate(SKILL_ORDER):
+            if i >= len(lines): break
+            parts = lines[i].split(",")
+            if len(parts) >= 3:
+                rank = int(parts[0]) if parts[0] != "-1" else None
+                level = int(parts[1]) if parts[1] != "-1" else 1
+                xp = int(parts[2]) if parts[2] != "-1" else 0
+                skills[skill_name.lower()] = {"rank": rank, "level": level, "xp": xp}
+
+        return jsonify({"username": username, "skills": skills})
+    except Exception as e:
+        return jsonify({"error": str(e), "skills": {}})
+
+# ─────────────────────────────────────────────
 #  PRICE ALERTS
 # ─────────────────────────────────────────────
 _price_alerts = []  # [{id, item_id, item_name, direction: 'above'|'below', target_price, active}]
@@ -3040,6 +3076,12 @@ tr:last-child td { border-bottom:none; }
     <div class="section">
         <div class="sh t2">🌳 Farming XP Calculator</div>
         <div style="padding:18px">
+            <!-- Hiscores Lookup -->
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;padding:10px 14px;background:#161b22;border:1px solid #30363d;border-radius:8px">
+                <button onclick="lookupFarmingLevel()" style="padding:8px 16px;background:#1f6feb;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:12px">📊 Hiscores Lookup</button>
+                <span id="farm-lookup-status" style="font-size:12px;color:#8b949e">Haalt je Farming level op via je RSN uit Instellingen</span>
+            </div>
+
             <!-- Level inputs -->
             <div style="display:flex;gap:16px;align-items:end;flex-wrap:wrap;margin-bottom:20px">
                 <div>
@@ -4581,6 +4623,37 @@ function initFarmingCalc() {
             populateFarmDropdowns();
             renderFarmPatches();
         });
+    // Auto-lookup als RSN al is ingesteld
+    lookupFarmingLevel(true);
+}
+
+async function lookupFarmingLevel(silent) {
+    let statusEl = document.getElementById('farm-lookup-status');
+    // Haal RSN uit instellingen
+    let settings;
+    try { settings = await (await fetch('/api/settings')).json(); } catch(e) { return; }
+    let rsn = settings.account_name;
+    if (!rsn || !rsn.trim()) {
+        if (!silent) statusEl.innerHTML = '<span style="color:#d29922">Vul eerst je RSN in bij Instellingen</span>';
+        return;
+    }
+    statusEl.innerHTML = `<span style="color:#58a6ff">Zoeken naar ${rsn}...</span>`;
+    try {
+        let d = await (await fetch('/api/hiscores/' + encodeURIComponent(rsn))).json();
+        if (d.error) {
+            statusEl.innerHTML = `<span style="color:#da3633">${d.error}</span>`;
+            return;
+        }
+        let farming = d.skills?.farming;
+        if (farming) {
+            document.getElementById('farm-current').value = farming.level;
+            statusEl.innerHTML = `<span style="color:#3fb950">✓ ${rsn} — Farming level ${farming.level} (${gp(farming.xp)} XP)</span>`;
+        } else {
+            statusEl.innerHTML = '<span style="color:#da3633">Farming data niet gevonden</span>';
+        }
+    } catch(e) {
+        statusEl.innerHTML = '<span style="color:#da3633">Hiscores lookup mislukt</span>';
+    }
 }
 
 function populateFarmDropdowns() {
